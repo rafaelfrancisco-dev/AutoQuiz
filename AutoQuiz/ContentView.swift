@@ -78,7 +78,7 @@ struct ContentView: View {
             if let selID = selectedItemID, let item = items.first(where: { $0.id == selID }) {
                 VStack {
                     if let content = item.content, !content.isEmpty {
-                        Text(content)
+                        DocumentView(text: content)
                     } else {
                         Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
                     }
