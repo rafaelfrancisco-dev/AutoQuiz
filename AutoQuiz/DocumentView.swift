@@ -15,8 +15,10 @@ struct DocumentView: View {
     @State private var question: Question?
     
     private func generateQuestion(_ session: LanguageModelSession) async throws -> Question {
+        let textToPrompt = text.prefix(3800)
+        
         let response = try await session.respond(
-            to: "Generate a multiple choice question with 4 choices for this content: \(text)",
+            to: "Generate a multiple choice question with 4 choices for this content: \(textToPrompt)",
             generating: Question.self
         )
         

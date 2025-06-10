@@ -8,14 +8,14 @@
 import Foundation
 import FoundationModels
 
-@Generable(description: "A multiple choice question")
+@Generable(description: "A multiple choice question with a valid response")
 struct Question {
     @Guide(description: "The question text")
     let question: String
     
-    @Guide(description: "All options for the multiple choice question")
+    @Guide(description: "All options for the multiple choice question, all must be distinct.")
     let options: [String]
     
-    @Guide(description: "The correct answer")
+    @Guide(description: "The correct answer for this question")
     let anwswer: String
 }

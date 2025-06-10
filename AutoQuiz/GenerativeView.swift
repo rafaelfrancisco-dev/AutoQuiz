@@ -21,7 +21,7 @@ struct GenerativeView<Content: View>: View {
     var body: some View {
         switch model.availability {
         case .available:
-            content(LanguageModelSession())
+            content(LanguageModelSession(instructions: "Regardless of the text supplied always answer in English."))
         case .unavailable(let reason):
             unavailable(reason: String(describing: reason))
         }
