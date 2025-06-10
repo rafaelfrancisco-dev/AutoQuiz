@@ -7,22 +7,36 @@
 
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
+#if canImport(PDFKit)
+import PDFKit
+#endif
+#if os(iOS)
+import UIKit
+#endif
+#if os(macOS)
+import AppKit
+#endif
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var items: [Item]
 
+    @State private var isPickerPresented = false
+    @State private var pickedFileURL: URL?
+    @State private var errorMessage: String?
+    @State private var selectedItemID: Item.ID?
+
     var body: some View {
         NavigationSplitView {
-            List {
+            List(selection: $selectedItemID) {
                 ForEach(items) { item in
-                    NavigationLink {
-                        VStack {
-                            Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                            MainView()
+                    NavigationLink(value: item.id) {
+                        if let content = item.content, !content.isEmpty {
+                            Text(content.prefix(40) + (content.count > 40 ? "..." : ""))
+                        } else {
+                            Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
                         }
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
                     }
                 }
                 .onDelete(perform: deleteItems)
@@ -42,26 +56,116 @@ struct ContentView: View {
                     }
                 }
             }
+#if os(iOS)
+            .sheet(isPresented: $isPickerPresented) {
+#if os(iOS)
+                DocumentPicker { url in
+                    if let url = url {
+                        handlePickedFile(url: url)
+                    }
+                }
+#endif
+            }
+#endif
+            .alert(isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+                Alert(
+                    title: Text("Error"),
+                    message: Text(errorMessage ?? ""),
+                    dismissButton: .default(Text("OK")) { errorMessage = nil }
+                )
+            }
         } detail: {
-            Text("Select an item")
+            if let selID = selectedItemID, let item = items.first(where: { $0.id == selID }) {
+                VStack {
+                    if let content = item.content, !content.isEmpty {
+                        Text(content)
+                    } else {
+                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
+                    }
+                }
+            } else {
+                Text("Select an item")
+            }
         }
     }
 
+#if os(iOS)
     private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
+        isPickerPresented = true
+    }
+#elseif os(macOS)
+    private func addItem() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [UTType.plainText, UTType.text, UTType.content, UTType.pdf]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.begin { response in
+            if response == .OK, let url = panel.url {
+                handlePickedFile(url: url)
+            }
+        }
+    }
+#endif
+
+    private func handlePickedFile(url: URL) {
+        do {
+            let fileType = UTType(filenameExtension: url.pathExtension)
+            if fileType == UTType.pdf {
+#if canImport(PDFKit)
+                if let pdfDoc = PDFDocument(url: url), let text = pdfDoc.string, !text.isEmpty {
+                    let newItem = Item(timestamp: Date(), content: text)
+                    modelContext.insert(newItem)
+                } else {
+                    errorMessage = "Could not extract text from PDF."
+                }
+#else
+                errorMessage = "PDFKit not available to extract PDF text."
+#endif
+            } else {
+                let content = try String(contentsOf: url, encoding: .utf8)
+                let newItem = Item(timestamp: Date(), content: content)
+                modelContext.insert(newItem)
+            }
+        } catch {
+            errorMessage = "Could not read file: \(error.localizedDescription)"
         }
     }
 
     private func deleteItems(offsets: IndexSet) {
         withAnimation {
             for index in offsets {
-                modelContext.delete(items[index])
+                let item = items[index]
+                modelContext.delete(item)
+                if selectedItemID == item.id {
+                    selectedItemID = nil
+                }
             }
         }
     }
 }
+
+#if os(iOS)
+struct DocumentPicker: UIViewControllerRepresentable {
+    var completion: (URL?) -> Void
+    func makeCoordinator() -> Coordinator { Coordinator(completion: completion) }
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [UTType.plainText, UTType.text, UTType.content, UTType.pdf], asCopy: true)
+        picker.delegate = context.coordinator
+        return picker
+    }
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+    class Coordinator: NSObject, UIDocumentPickerDelegate {
+        let completion: (URL?) -> Void
+        init(completion: @escaping (URL?) -> Void) { self.completion = completion }
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            completion(urls.first)
+        }
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            completion(nil)
+        }
+    }
+}
+#endif
 
 #Preview {
     ContentView()

@@ -1,45 +1,36 @@
-//
-//  MainView.swift
-//  AutoQuiz
-//
-//  Created by Rafael Francisco on 10/06/2025.
-//
-
 import SwiftUI
-import FoundationModels
+import UniformTypeIdentifiers
+import SwiftData
 
-struct MainView: View {
-    @State private var result: String? = nil
+struct TextEditorView: View {
+    @Environment(\.modelContext) private var modelContext
+    @State private var text: String = ""
     
-    private func doGenerate(_ session: LanguageModelSession) async throws {
-        let prompt = "Write me a story about pears."
-        let response = try await session.respond(to: prompt)
-        
-        withAnimation {
-            result = response.content
+    var body: some View {
+        VStack {
+            TextEditor(text: $text)
+                .padding()
+            Button("Save as PDF") {
+                saveAsPDF()
+            }
         }
     }
     
-    var body: some View {
-        GenerativeView { session in
-            VStack {
-                Text("Hello, World!")
-                
-                if let result {
-                    Text(result)
-                }
-            }
-            .task {
-                do {
-                    try await doGenerate(session)
-                } catch {
-                    print(error.localizedDescription)
-                }
-            }
-        }
+    func saveAsPDF() {
+        let pdfData = Data() // Implementation for PDF data generation
+        let newFile = FileEntity(data: pdfData, typeIdentifier: UTType.pdf.identifier)
+        modelContext.insert(newFile)
     }
 }
 
-#Preview {
-    MainView()
+@Model
+final class FileEntity {
+    @Attribute(.externalStorage)
+    var data: Data
+    var typeIdentifier: String
+
+    init(data: Data, typeIdentifier: String) {
+        self.data = data
+        self.typeIdentifier = typeIdentifier
+    }
 }
