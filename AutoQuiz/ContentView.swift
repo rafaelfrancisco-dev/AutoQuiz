@@ -50,7 +50,7 @@ struct ContentView: View {
                     EditButton()
                 }
 #endif
-                ToolbarItem {
+                ToolbarItem(placement: .navigation) {
                     Button(action: addItem) {
                         Label("Add Item", systemImage: "plus")
                     }
