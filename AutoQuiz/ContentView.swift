@@ -32,8 +32,8 @@ struct ContentView: View {
             List(selection: $selectedItemID) {
                 ForEach(items) { item in
                     NavigationLink(value: item.id) {
-                        if let content = item.content, !content.isEmpty {
-                            Text(content.prefix(40) + (content.count > 40 ? "..." : ""))
+                        if !item.content.isEmpty {
+                            Text(item.content.prefix(40) + (item.content.count > 40 ? "..." : ""))
                         } else {
                             Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
                         }
@@ -76,13 +76,7 @@ struct ContentView: View {
             }
         } detail: {
             if let selID = selectedItemID, let item = items.first(where: { $0.id == selID }) {
-                VStack {
-                    if let content = item.content, !content.isEmpty {
-                        DocumentView(text: content)
-                    } else {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    }
-                }
+                DocumentView(text: item.content, timestamp: item.timestamp)
             } else {
                 Text("Select an item")
             }
@@ -96,9 +90,11 @@ struct ContentView: View {
 #elseif os(macOS)
     private func addItem() {
         let panel = NSOpenPanel()
+        
         panel.allowedContentTypes = [UTType.plainText, UTType.text, UTType.content, UTType.pdf]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
+        
         panel.begin { response in
             if response == .OK, let url = panel.url {
                 handlePickedFile(url: url)

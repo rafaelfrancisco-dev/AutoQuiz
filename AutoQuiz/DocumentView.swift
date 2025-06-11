@@ -10,9 +10,12 @@ import FoundationModels
 
 struct DocumentView: View {
     let text: String
+    let timestamp: Date
     
     @State private var isGenerating = false
+    
     @State private var question: Question?
+    @State private var title: String?
     
     private func generateQuestion(_ session: LanguageModelSession) async throws -> Question {
         let textToPrompt = text.prefix(3800)
@@ -20,6 +23,16 @@ struct DocumentView: View {
         let response = try await session.respond(
             to: "Generate a multiple choice question with 4 choices for this content: \(textToPrompt)",
             generating: Question.self
+        )
+        
+        return response.content
+    }
+    
+    private func generateTitle(_ session: LanguageModelSession) async throws -> String {
+        let textToPrompt = text.prefix(3800)
+        
+        let response = try await session.respond(
+            to: "Create a title for this content with 6 words max: \(textToPrompt)"
         )
         
         return response.content
@@ -52,6 +65,10 @@ struct DocumentView: View {
                             withAnimation {
                                 question = result
                             }
+                            
+                            let title = try await generateTitle(session)
+                            
+                            print(title)
                         } catch {
                             print(error.localizedDescription)
                         }
@@ -62,11 +79,33 @@ struct DocumentView: View {
                     }
                 }
                 .disabled(isGenerating)
+                .task {
+                    if title == nil {
+                        withAnimation {
+                            isGenerating = true
+                        }
+                        
+                        do {
+                            let title = try await generateTitle(session)
+                            
+                            withAnimation {
+                                self.title = title
+                            }
+                        } catch {
+                            print(error.localizedDescription)
+                        }
+                        
+                        withAnimation {
+                            isGenerating = false
+                        }
+                    }
+                }
             }
         }
+        .navigationTitle(title ?? timestamp.description)
     }
 }
 
 #Preview {
-    DocumentView(text: "test")
+    DocumentView(text: "test", timestamp: .now)
 }
