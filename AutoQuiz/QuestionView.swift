@@ -21,8 +21,6 @@ struct QuestionView: View {
                     onQuestionAnswered(q == question.anwswer)
                 }
             }
-            
-            Text("correct answer is: \(question.anwswer)")
         }
     }
 }

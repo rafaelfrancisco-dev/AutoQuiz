@@ -17,9 +17,39 @@ struct DocumentView: View {
     
     var body: some View {
         GenerativeView { session in
-            if let question = viewModel.item.questions.first {
-                QuestionView(question: question) { isValid in
-                    
+            if !viewModel.item.questions.isEmpty {
+                VStack {
+                    if viewModel.item.questions.indices.contains(viewModel.currentQuestionIndex) {
+                        QuestionView(question: viewModel.item.questions[viewModel.currentQuestionIndex]) { isValid in
+                            viewModel.answeredQuestion(question: viewModel.item.questions[viewModel.currentQuestionIndex], correct: isValid)
+                        }
+                        .padding()
+                        
+                        Spacer()
+                        
+                        HStack {
+                            Button("Previous") {
+                                if viewModel.currentQuestionIndex > 0 {
+                                    withAnimation {
+                                        viewModel.currentQuestionIndex -= 1
+                                    }
+                                }
+                            }
+                            .disabled(viewModel.currentQuestionIndex == 0)
+                            
+                            Spacer()
+                            
+                            Button("Next") {
+                                if viewModel.currentQuestionIndex < viewModel.item.questions.count - 1 {
+                                    withAnimation {
+                                        viewModel.currentQuestionIndex += 1
+                                    }
+                                }
+                            }
+                            .disabled(viewModel.currentQuestionIndex >= viewModel.item.questions.count - 1)
+                        }
+                        .padding()
+                    }
                 }
             } else {
                 VStack {
