@@ -75,8 +75,8 @@ struct ContentView: View {
                 )
             }
         } detail: {
-            if let selID = selectedItemID, let item = items.first(where: { $0.id == selID }) {
-                DocumentView(text: item.content, timestamp: item.timestamp)
+            if let selID = selectedItemID {
+                DocumentView(item: items.first(where: { $0.id == selID })!)
             } else {
                 Text("Select an item")
             }
@@ -132,6 +132,7 @@ struct ContentView: View {
             for index in offsets {
                 let item = items[index]
                 modelContext.delete(item)
+                
                 if selectedItemID == item.id {
                     selectedItemID = nil
                 }

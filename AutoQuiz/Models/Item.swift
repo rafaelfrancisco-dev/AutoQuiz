@@ -12,9 +12,13 @@ import SwiftData
 final class Item {
     var timestamp: Date
     var content: String
+    var title: String?
+    var questions: [Question]
     
     init(timestamp: Date, content: String) {
         self.timestamp = timestamp
         self.content = content
+        self.title = nil
+        self.questions = []
     }
 }

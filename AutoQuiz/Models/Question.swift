@@ -5,11 +5,11 @@
 //  Created by Rafael Francisco on 10/06/2025.
 //
 
-import Foundation
+import SwiftData
 import FoundationModels
 
 @Generable(description: "A multiple choice question with a valid response")
-struct Question {
+struct Question: Codable {
     @Guide(description: "The question text")
     let question: String
     
