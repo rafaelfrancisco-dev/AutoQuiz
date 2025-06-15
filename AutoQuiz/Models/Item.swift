@@ -33,8 +33,4 @@ final class Item {
         self.questions = []
         self.trueFalseQuestions = []
     }
-    
-    var safeTrueFalseQuestions: [TrueFalseQuestion] {
-        return trueFalseQuestions ?? []
-    }
 }

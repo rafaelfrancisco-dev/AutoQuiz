@@ -32,7 +32,7 @@ final class DocumentViewModel {
     }
     
     func answeredTrueFalseQuestion(question: TrueFalseQuestion, correct: Bool) {
-        if currentQuestionIndex < item.safeTrueFalseQuestions.count - 1 {
+        if currentQuestionIndex < (item.trueFalseQuestions?.count ?? 0) - 1 {
             withAnimation {
                 currentQuestionIndex += 1
             }

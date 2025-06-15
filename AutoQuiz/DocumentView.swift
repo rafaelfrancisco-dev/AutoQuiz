@@ -36,10 +36,10 @@ struct DocumentView: View {
                             generateQuestionButton(session: session)
                         }
                     } else if selectedQuestionType == .trueFalse {
-                        if !viewModel.item.safeTrueFalseQuestions.isEmpty {
-                            if viewModel.item.safeTrueFalseQuestions.indices.contains(viewModel.currentQuestionIndex) {
-                                TrueFalseQuestionView(question: viewModel.item.safeTrueFalseQuestions[viewModel.currentQuestionIndex]) { isValid in
-                                    viewModel.answeredTrueFalseQuestion(question: viewModel.item.safeTrueFalseQuestions[viewModel.currentQuestionIndex], correct: isValid)
+                        if !(viewModel.item.trueFalseQuestions ?? []).isEmpty {
+                            if (viewModel.item.trueFalseQuestions ?? []).indices.contains(viewModel.currentQuestionIndex) {
+                                TrueFalseQuestionView(question: viewModel.item.trueFalseQuestions![viewModel.currentQuestionIndex]) { isValid in
+                                    viewModel.answeredTrueFalseQuestion(question: viewModel.item.trueFalseQuestions![viewModel.currentQuestionIndex], correct: isValid)
                                 }
                                 .padding()
                             }
@@ -129,7 +129,7 @@ struct DocumentView: View {
     }
     
     private var hasQuestions: Bool {
-        !viewModel.item.questions.isEmpty || !viewModel.item.safeTrueFalseQuestions.isEmpty
+        !viewModel.item.questions.isEmpty || !(viewModel.item.trueFalseQuestions ?? []).isEmpty
     }
     
     private var questionTypeToggle: some View {
@@ -156,9 +156,9 @@ struct DocumentView: View {
             Spacer()
             
             Button("Next") {
-                let maxIndex = selectedQuestionType == .multipleChoice ? 
-                    viewModel.item.questions.count - 1 : 
-                    viewModel.item.safeTrueFalseQuestions.count - 1
+                let maxIndex = selectedQuestionType == .multipleChoice ?
+                viewModel.item.questions.count - 1 :
+                (viewModel.item.trueFalseQuestions?.count ?? 0) - 1
                 
                 if viewModel.currentQuestionIndex < maxIndex {
                     withAnimation {
@@ -166,9 +166,9 @@ struct DocumentView: View {
                     }
                 }
             }
-            .disabled(viewModel.currentQuestionIndex >= (selectedQuestionType == .multipleChoice ? 
-                viewModel.item.questions.count - 1 : 
-                viewModel.item.safeTrueFalseQuestions.count - 1))
+            .disabled(viewModel.currentQuestionIndex >= (selectedQuestionType == .multipleChoice ?
+                                                         viewModel.item.questions.count - 1 :
+                                                            (viewModel.item.trueFalseQuestions?.count ?? 0) - 1))
         }
         .padding()
     }
