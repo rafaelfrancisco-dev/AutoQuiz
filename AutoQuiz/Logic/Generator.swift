@@ -15,12 +15,23 @@ final class Generator {
         self.item = item
     }
     
-    func generateQuestion(_ session: LanguageModelSession) async throws -> Question {
+    func generateMultipleChoiceQuestion(_ session: LanguageModelSession) async throws -> MultipleChoiceQuestion {
         let textToPrompt = item.content.prefix(3800)
         
         let response = try await session.respond(
             to: "Generate a multiple choice question with 4 choices for this content: \(textToPrompt)",
-            generating: Question.self
+            generating: MultipleChoiceQuestion.self
+        )
+        
+        return response.content
+    }
+    
+    func generateTrueFalseQuestion(_ session: LanguageModelSession) async throws -> TrueFalseQuestion {
+        let textToPrompt = item.content.prefix(3800)
+        
+        let response = try await session.respond(
+            to: "Generate a true or false question for this content: \(textToPrompt)",
+            generating: TrueFalseQuestion.self
         )
         
         return response.content

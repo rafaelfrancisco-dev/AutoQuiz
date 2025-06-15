@@ -13,7 +13,7 @@ final class Item {
     var timestamp: Date
     var content: String
     var title: String?
-    var questions: [Question]
+    var questions: [MultipleChoiceQuestion]
     
     init(timestamp: Date, content: String) {
         self.timestamp = timestamp

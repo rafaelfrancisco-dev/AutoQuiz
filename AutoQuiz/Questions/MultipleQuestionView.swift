@@ -7,8 +7,8 @@
 
 import SwiftUI
 
-struct QuestionView: View {
-    let question: Question
+struct MultipleQuestionView: View {
+    let question: MultipleChoiceQuestion
     
     let onQuestionAnswered: (Bool) -> Void
     
@@ -26,5 +26,5 @@ struct QuestionView: View {
 }
 
 #Preview {
-    QuestionView(question: Question(question: "Yes ?", options: ["Yes", "No"], anwswer: "Yes")) { _ in }
+    MultipleQuestionView(question: MultipleChoiceQuestion(question: "Yes ?", options: ["Yes", "No"], anwswer: "Yes")) { _ in }
 }

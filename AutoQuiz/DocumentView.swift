@@ -20,7 +20,7 @@ struct DocumentView: View {
             if !viewModel.item.questions.isEmpty {
                 VStack {
                     if viewModel.item.questions.indices.contains(viewModel.currentQuestionIndex) {
-                        QuestionView(question: viewModel.item.questions[viewModel.currentQuestionIndex]) { isValid in
+                        MultipleQuestionView(question: viewModel.item.questions[viewModel.currentQuestionIndex]) { isValid in
                             viewModel.answeredQuestion(question: viewModel.item.questions[viewModel.currentQuestionIndex], correct: isValid)
                         }
                         .padding()
@@ -65,7 +65,7 @@ struct DocumentView: View {
                                 }
                                 
                                 do {
-                                    let result = try await viewModel.generator.generateQuestion(session)
+                                    let result = try await viewModel.generator.generateMultipleChoiceQuestion(session)
                                     
                                     withAnimation {
                                         viewModel.item.questions.append(result)

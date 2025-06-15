@@ -9,7 +9,7 @@ import SwiftData
 import FoundationModels
 
 @Generable(description: "A multiple choice question with a valid response")
-struct Question: Codable {
+struct MultipleChoiceQuestion: Codable {
     @Guide(description: "The question text")
     let question: String
     

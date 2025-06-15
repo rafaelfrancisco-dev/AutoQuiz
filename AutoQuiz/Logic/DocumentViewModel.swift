@@ -23,7 +23,7 @@ final class DocumentViewModel {
         self.generator = Generator(item: item)
     }
     
-    func answeredQuestion(question: Question, correct: Bool) {
+    func answeredQuestion(question: MultipleChoiceQuestion, correct: Bool) {
         if currentQuestionIndex < item.questions.count - 1 {
             withAnimation {
                 currentQuestionIndex += 1
