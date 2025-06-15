@@ -76,8 +76,9 @@ struct ContentView: View {
                 )
             }
         } detail: {
-            if let selID = selectedItemID {
-                DocumentView(item: items.first(where: { $0.id == selID })!)
+            if let selID = selectedItemID,
+               let selectedItem = items.first(where: { $0.id == selID }) {
+                DocumentView(item: selectedItem)
             } else {
                 Text("Select an item")
             }
