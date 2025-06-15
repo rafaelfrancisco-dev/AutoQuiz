@@ -24,19 +24,27 @@ struct DocumentView: View {
                     
                     Spacer()
                     
-                    if selectedQuestionType == .multipleChoice && !viewModel.item.questions.isEmpty {
-                        if viewModel.item.questions.indices.contains(viewModel.currentQuestionIndex) {
-                            MultipleQuestionView(question: viewModel.item.questions[viewModel.currentQuestionIndex]) { isValid in
-                                viewModel.answeredQuestion(question: viewModel.item.questions[viewModel.currentQuestionIndex], correct: isValid)
+                    if selectedQuestionType == .multipleChoice {
+                        if !viewModel.item.questions.isEmpty {
+                            if viewModel.item.questions.indices.contains(viewModel.currentQuestionIndex) {
+                                MultipleQuestionView(question: viewModel.item.questions[viewModel.currentQuestionIndex]) { isValid in
+                                    viewModel.answeredQuestion(question: viewModel.item.questions[viewModel.currentQuestionIndex], correct: isValid)
+                                }
+                                .padding()
                             }
-                            .padding()
+                        } else {
+                            generateQuestionButton(session: session)
                         }
-                    } else if selectedQuestionType == .trueFalse && !viewModel.item.safeTrueFalseQuestions.isEmpty {
-                        if viewModel.item.safeTrueFalseQuestions.indices.contains(viewModel.currentQuestionIndex) {
-                            TrueFalseQuestionView(question: viewModel.item.safeTrueFalseQuestions[viewModel.currentQuestionIndex]) { isValid in
-                                viewModel.answeredTrueFalseQuestion(question: viewModel.item.safeTrueFalseQuestions[viewModel.currentQuestionIndex], correct: isValid)
+                    } else if selectedQuestionType == .trueFalse {
+                        if !viewModel.item.safeTrueFalseQuestions.isEmpty {
+                            if viewModel.item.safeTrueFalseQuestions.indices.contains(viewModel.currentQuestionIndex) {
+                                TrueFalseQuestionView(question: viewModel.item.safeTrueFalseQuestions[viewModel.currentQuestionIndex]) { isValid in
+                                    viewModel.answeredTrueFalseQuestion(question: viewModel.item.safeTrueFalseQuestions[viewModel.currentQuestionIndex], correct: isValid)
+                                }
+                                .padding()
                             }
-                            .padding()
+                        } else {
+                            generateQuestionButton(session: session)
                         }
                     }
                     
@@ -126,11 +134,8 @@ struct DocumentView: View {
     
     private var questionTypeToggle: some View {
         Picker("Question Type", selection: $selectedQuestionType) {
-            if !viewModel.item.questions.isEmpty {
-                Text(QuestionType.multipleChoice.rawValue).tag(QuestionType.multipleChoice)
-            }
-            if !viewModel.item.safeTrueFalseQuestions.isEmpty {
-                Text(QuestionType.trueFalse.rawValue).tag(QuestionType.trueFalse)
+            ForEach(QuestionType.allCases, id: \.self) { type in
+                Text(type.rawValue).tag(type)
             }
         }
         .pickerStyle(.segmented)
@@ -166,6 +171,48 @@ struct DocumentView: View {
                 viewModel.item.safeTrueFalseQuestions.count - 1))
         }
         .padding()
+    }
+    
+    private func generateQuestionButton(session: LanguageModelSession) -> some View {
+        VStack {
+            if viewModel.isGenerating {
+                ProgressView()
+            }
+            
+            Button("Generate \(selectedQuestionType.rawValue) Question") {
+                Task {
+                    withAnimation {
+                        viewModel.isGenerating = true
+                    }
+                    
+                    do {
+                        if selectedQuestionType == .multipleChoice {
+                            let result = try await viewModel.generator.generateMultipleChoiceQuestion(session)
+                            withAnimation {
+                                viewModel.item.questions.append(result)
+                                viewModel.currentQuestionIndex = 0
+                            }
+                        } else {
+                            let result = try await viewModel.generator.generateTrueFalseQuestion(session)
+                            withAnimation {
+                                if viewModel.item.trueFalseQuestions == nil {
+                                    viewModel.item.trueFalseQuestions = []
+                                }
+                                viewModel.item.trueFalseQuestions?.append(result)
+                                viewModel.currentQuestionIndex = 0
+                            }
+                        }
+                    } catch {
+                        print(error.localizedDescription)
+                    }
+                    
+                    withAnimation {
+                        viewModel.isGenerating = false
+                    }
+                }
+            }
+            .disabled(viewModel.isGenerating)
+        }
     }
 }
 
