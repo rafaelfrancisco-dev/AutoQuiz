@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import SwiftData
+import FoundationModels
 
 @Observable
 final class DocumentViewModel {
@@ -17,6 +18,10 @@ final class DocumentViewModel {
     
     var isGenerating = false
     var currentQuestionIndex: Int = 0
+    var isBackgroundGenerating = false
+    
+    private var backgroundGenerationTask: Task<Void, Never>?
+    private let maxBackgroundQuestions = 3
     
     var currentPoints: Int {
         return item.totalPoints
@@ -26,6 +31,10 @@ final class DocumentViewModel {
         self.item = item
         self.generator = Generator(item: item)
         self.modelContext = modelContext
+    }
+    
+    deinit {
+        backgroundGenerationTask?.cancel()
     }
     
     func answeredQuestion(question: MultipleChoiceQuestion, correct: Bool, userAnswer: String) {
@@ -80,5 +89,78 @@ final class DocumentViewModel {
                 currentQuestionIndex += 1
             }
         }
+    }
+    
+    func startBackgroundGeneration(session: LanguageModelSession) {
+        backgroundGenerationTask?.cancel()
+        
+        backgroundGenerationTask = Task { @MainActor in
+            await generateBackgroundQuestions(session: session)
+        }
+    }
+    
+    func stopBackgroundGeneration() {
+        backgroundGenerationTask?.cancel()
+        backgroundGenerationTask = nil
+        isBackgroundGenerating = false
+    }
+    
+    @MainActor
+    private func generateBackgroundQuestions(session: LanguageModelSession) async {
+        guard backgroundGenerationTask?.isCancelled == false else { return }
+        
+        isBackgroundGenerating = true
+        
+        while backgroundGenerationTask?.isCancelled == false {
+            let shouldGenerateMultiple = item.questions.count < maxBackgroundQuestions
+            let shouldGenerateTrueFalse = (item.trueFalseQuestions?.count ?? 0) < maxBackgroundQuestions
+            
+            if !shouldGenerateMultiple && !shouldGenerateTrueFalse {
+                break
+            }
+            
+            if shouldGenerateMultiple {
+                do {
+                    let question = try await generator.generateMultipleChoiceQuestion(session)
+                    guard backgroundGenerationTask?.isCancelled == false else { break }
+                    
+                    withAnimation {
+                        item.questions.append(question)
+                    }
+                    
+                    try? modelContext?.save()
+                } catch {
+                    print("Background generation error (multiple choice): \(error)")
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                }
+            }
+            
+            guard backgroundGenerationTask?.isCancelled == false else { break }
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            
+            if shouldGenerateTrueFalse {
+                do {
+                    let question = try await generator.generateTrueFalseQuestion(session)
+                    guard backgroundGenerationTask?.isCancelled == false else { break }
+                    
+                    withAnimation {
+                        if item.trueFalseQuestions == nil {
+                            item.trueFalseQuestions = []
+                        }
+                        item.trueFalseQuestions?.append(question)
+                    }
+                    
+                    try? modelContext?.save()
+                } catch {
+                    print("Background generation error (true/false): \(error)")
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                }
+            }
+            
+            guard backgroundGenerationTask?.isCancelled == false else { break }
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+        }
+        
+        isBackgroundGenerating = false
     }
 }

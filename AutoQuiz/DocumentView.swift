@@ -56,6 +56,9 @@ struct DocumentView: View {
                     
                     navigationControls
                 }
+                .onAppear {
+                    viewModel.startBackgroundGeneration(session: session)
+                }
             } else {
                 VStack {
                     if viewModel.isGenerating {
@@ -126,12 +129,17 @@ struct DocumentView: View {
                             viewModel.isGenerating = false
                         }
                     }
+                    
+                    viewModel.startBackgroundGeneration(session: session)
                 }
             }
         }
         .navigationTitle(viewModel.item.title ?? viewModel.item.timestamp.description)
         .onAppear {
             viewModel.modelContext = modelContext
+        }
+        .onDisappear {
+            viewModel.stopBackgroundGeneration()
         }
     }
     
@@ -144,7 +152,18 @@ struct DocumentView: View {
             Text("Points: \(viewModel.currentPoints)")
                 .font(.headline)
                 .foregroundColor(.primary)
+            
             Spacer()
+            
+            if viewModel.isBackgroundGenerating {
+                HStack(spacing: 4) {
+                    ProgressView()
+                        .scaleEffect(0.6)
+                    Text("Generating questions...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
         }
         .padding(.horizontal)
     }
