@@ -10,7 +10,7 @@ import SwiftUI
 struct MultipleQuestionView: View {
     let question: MultipleChoiceQuestion
     
-    let onQuestionAnswered: (Bool) -> Void
+    let onQuestionAnswered: (Bool, String) -> Void
     
     var body: some View {
         VStack {
@@ -18,7 +18,7 @@ struct MultipleQuestionView: View {
             
             ForEach(question.options, id: \.self) { q in
                 Button(q) {
-                    onQuestionAnswered(q == question.anwswer)
+                    onQuestionAnswered(q == question.anwswer, q)
                 }
             }
         }
@@ -26,5 +26,5 @@ struct MultipleQuestionView: View {
 }
 
 #Preview {
-    MultipleQuestionView(question: MultipleChoiceQuestion(question: "Yes ?", options: ["Yes", "No"], anwswer: "Yes")) { _ in }
+    MultipleQuestionView(question: MultipleChoiceQuestion(question: "Yes ?", options: ["Yes", "No"], anwswer: "Yes")) { _, _ in }
 }

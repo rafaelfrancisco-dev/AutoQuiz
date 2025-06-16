@@ -22,6 +22,15 @@ struct AutoQuizApp: App {
             fatalError("Could not create ModelContainer: \(error)")
         }
     }()
+    
+    // Migration-ready container (use this when you need to migrate)
+    static var migrationModelContainer: ModelContainer = {
+        do {
+            return try ModelContainer(for: Item.self, migrationPlan: ItemMigrationPlan.self)
+        } catch {
+            fatalError("Could not create ModelContainer with migration: \(error)")
+        }
+    }()
 
     var body: some Scene {
         WindowGroup {

@@ -10,7 +10,7 @@ import SwiftUI
 struct TrueFalseQuestionView: View {
     let question: TrueFalseQuestion
     
-    let onQuestionAnswered: (Bool) -> Void
+    let onQuestionAnswered: (Bool, Bool) -> Void
     
     var body: some View {
         VStack {
@@ -21,13 +21,13 @@ struct TrueFalseQuestionView: View {
             
             HStack(spacing: 40) {
                 Button("True") {
-                    onQuestionAnswered(question.isTrue)
+                    onQuestionAnswered(question.isTrue, true)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 
                 Button("False") {
-                    onQuestionAnswered(!question.isTrue)
+                    onQuestionAnswered(!question.isTrue, false)
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
@@ -37,5 +37,5 @@ struct TrueFalseQuestionView: View {
 }
 
 #Preview {
-    TrueFalseQuestionView(question: TrueFalseQuestion(question: "Swift is a programming language?", isTrue: true)) { _ in }
+    TrueFalseQuestionView(question: TrueFalseQuestion(question: "Swift is a programming language?", isTrue: true)) { _, _ in }
 }

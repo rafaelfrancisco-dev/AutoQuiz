@@ -6,11 +6,13 @@
 //
 
 import SwiftUI
+import SwiftData
 import FoundationModels
 
 struct DocumentView: View {
     @State private var viewModel: DocumentViewModel
-    @State private var selectedQuestionType: QuestionType = .multipleChoice
+    @State private var selectedQuestionType: Question = .multipleChoice
+    @Environment(\.modelContext) private var modelContext
     
     init(item: Item) {
         self.viewModel = DocumentViewModel(item: item)
@@ -20,6 +22,8 @@ struct DocumentView: View {
         GenerativeView { session in
             if hasQuestions {
                 VStack {
+                    pointsDisplay
+                    
                     questionTypeToggle
                     
                     Spacer()
@@ -27,8 +31,8 @@ struct DocumentView: View {
                     if selectedQuestionType == .multipleChoice {
                         if !viewModel.item.questions.isEmpty {
                             if viewModel.item.questions.indices.contains(viewModel.currentQuestionIndex) {
-                                MultipleQuestionView(question: viewModel.item.questions[viewModel.currentQuestionIndex]) { isValid in
-                                    viewModel.answeredQuestion(question: viewModel.item.questions[viewModel.currentQuestionIndex], correct: isValid)
+                                MultipleQuestionView(question: viewModel.item.questions[viewModel.currentQuestionIndex]) { isValid, userAnswer in
+                                    viewModel.answeredQuestion(question: viewModel.item.questions[viewModel.currentQuestionIndex], correct: isValid, userAnswer: userAnswer)
                                 }
                                 .padding()
                             }
@@ -38,8 +42,8 @@ struct DocumentView: View {
                     } else if selectedQuestionType == .trueFalse {
                         if !(viewModel.item.trueFalseQuestions ?? []).isEmpty {
                             if (viewModel.item.trueFalseQuestions ?? []).indices.contains(viewModel.currentQuestionIndex) {
-                                TrueFalseQuestionView(question: viewModel.item.trueFalseQuestions![viewModel.currentQuestionIndex]) { isValid in
-                                    viewModel.answeredTrueFalseQuestion(question: viewModel.item.trueFalseQuestions![viewModel.currentQuestionIndex], correct: isValid)
+                                TrueFalseQuestionView(question: viewModel.item.trueFalseQuestions![viewModel.currentQuestionIndex]) { isValid, userAnswer in
+                                    viewModel.answeredTrueFalseQuestion(question: viewModel.item.trueFalseQuestions![viewModel.currentQuestionIndex], correct: isValid, userAnswer: userAnswer)
                                 }
                                 .padding()
                             }
@@ -61,7 +65,7 @@ struct DocumentView: View {
                     if !hasQuestions {
                         VStack {
                             Picker("Question Type", selection: $selectedQuestionType) {
-                                ForEach(QuestionType.allCases, id: \.self) { type in
+                                ForEach(Question.allCases, id: \.self) { type in
                                     Text(type.rawValue).tag(type)
                                 }
                             }
@@ -126,15 +130,28 @@ struct DocumentView: View {
             }
         }
         .navigationTitle(viewModel.item.title ?? viewModel.item.timestamp.description)
+        .onAppear {
+            viewModel.modelContext = modelContext
+        }
     }
     
     private var hasQuestions: Bool {
         !viewModel.item.questions.isEmpty || !(viewModel.item.trueFalseQuestions ?? []).isEmpty
     }
     
+    private var pointsDisplay: some View {
+        HStack {
+            Text("Points: \(viewModel.currentPoints)")
+                .font(.headline)
+                .foregroundColor(.primary)
+            Spacer()
+        }
+        .padding(.horizontal)
+    }
+    
     private var questionTypeToggle: some View {
         Picker("Question Type", selection: $selectedQuestionType) {
-            ForEach(QuestionType.allCases, id: \.self) { type in
+            ForEach(Question.allCases, id: \.self) { type in
                 Text(type.rawValue).tag(type)
             }
         }
