@@ -13,7 +13,7 @@ struct MultipleChoiceQuestion: Codable {
     @Guide(description: "The question text")
     let question: String
     
-    @Guide(description: "All options for the multiple choice question, all must be distinct and the count must always be four")
+    @Guide(description: "All options for the multiple choice question, all must be distinct and the count must always be four. Don't add the A., B., C. and so on prefix")
     let options: [String]
     
     @Guide(description: "The correct answer for this question")

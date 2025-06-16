@@ -8,27 +8,35 @@
 import Foundation
 import FoundationModels
 
-extension String {
-    func chunked(into size: Int) -> [String] {
-        var chunks: [String] = []
-        var currentIndex = startIndex
-        
-        while currentIndex < endIndex {
-            let endIdx = index(currentIndex, offsetBy: size, limitedBy: endIndex) ?? endIndex
-            chunks.append(String(self[currentIndex..<endIdx]))
-            currentIndex = endIdx
-        }
-        
-        return chunks
-    }
+enum GeneratorError: Error {
+    case sessionUnavailable
+}
+
+@Generable(description: "Multiple multiple choice questions")
+struct MultipleChoiceQuestionBatch: Codable {
+    @Guide(description: "An array of 2-4 multiple choice questions")
+    let questions: [MultipleChoiceQuestion]
+}
+
+@Generable(description: "Multiple true or false questions")
+struct TrueFalseQuestionBatch: Codable {
+    @Guide(description: "An array of 2-4 true or false questions")
+    let questions: [TrueFalseQuestion]
 }
 
 final class Generator {
     let item: Item
-    private let maxChunkSize = 3000
+    private let model = SystemLanguageModel.default
+    
+    private let maxChunkSize = 3500
     
     init(item: Item) {
         self.item = item
+    }
+    
+    private func createSession() -> LanguageModelSession? {
+        guard model.availability == .available else { return nil }
+        return LanguageModelSession(instructions: "Always answer in English (en-US).")
     }
     
     private func getRandomContentChunk() -> String {
@@ -42,29 +50,41 @@ final class Generator {
         return chunks.randomElement() ?? String(content.prefix(maxChunkSize))
     }
     
-    func generateMultipleChoiceQuestion(_ session: LanguageModelSession) async throws -> MultipleChoiceQuestion {
+    func generateMultipleChoiceQuestions() async throws -> [MultipleChoiceQuestion] {
+        guard let session = createSession() else {
+            throw GeneratorError.sessionUnavailable
+        }
+        
         let textToPrompt = getRandomContentChunk()
         
         let response = try await session.respond(
-            to: "Generate a multiple choice question with 4 choices for this content: \(textToPrompt)",
-            generating: MultipleChoiceQuestion.self
+            to: "Generate 2-4 multiple choice questions with 4 choices each for this content: \(textToPrompt)",
+            generating: MultipleChoiceQuestionBatch.self
         )
         
-        return response.content
+        return response.content.questions
     }
     
-    func generateTrueFalseQuestion(_ session: LanguageModelSession) async throws -> TrueFalseQuestion {
+    func generateTrueFalseQuestions() async throws -> [TrueFalseQuestion] {
+        guard let session = createSession() else {
+            throw GeneratorError.sessionUnavailable
+        }
+        
         let textToPrompt = getRandomContentChunk()
         
         let response = try await session.respond(
-            to: "Generate a true or false question for this content: \(textToPrompt)",
-            generating: TrueFalseQuestion.self
+            to: "Generate 2-4 true or false questions for this content: \(textToPrompt)",
+            generating: TrueFalseQuestionBatch.self
         )
         
-        return response.content
+        return response.content.questions
     }
     
-    func generateTitle(_ session: LanguageModelSession) async throws -> String {
+    func generateTitle() async throws -> String {
+        guard let session = createSession() else {
+            throw GeneratorError.sessionUnavailable
+        }
+        
         let textToPrompt = getRandomContentChunk()
         
         let response = try await session.respond(
