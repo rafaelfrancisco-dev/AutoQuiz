@@ -23,7 +23,9 @@ final class DocumentViewModel {
     var hasStartedQuiz = false
     var selectedQuestionType: Question = .multipleChoice
     private var currentSessionAnswers: Set<Int> = []
+    private var currentSessionAnsweredQuestions: [AnsweredQuestion] = []
     private var lastAnswerCorrect: Bool?
+    var showingResults = false
     
     var isWaitingForNextQuestion = false
     private var lastKnownQuestionCount: (multiple: Int, trueFalse: Int) = (0, 0)
@@ -45,9 +47,11 @@ final class DocumentViewModel {
         hasStartedQuiz = true
         currentQuestionIndex = 0
         currentSessionAnswers.removeAll()
+        currentSessionAnsweredQuestions.removeAll()
         lastAnswerCorrect = nil
         isWaitingForNextQuestion = false
         lastKnownQuestionCount = currentQuestionCounts
+        showingResults = false
     }
     
     func switchQuestionType(to type: Question) {
@@ -68,13 +72,10 @@ final class DocumentViewModel {
             item.questions.count - 1 :
             (item.trueFalseQuestions?.count ?? 0) - 1
         
-        return isCurrentQuestionAnswered && currentQuestionIndex < maxIndex
+        // Only show next button when viewing a past answered question (for navigation)
+        return currentQuestionIndex < maxIndex && isCurrentQuestionAnswered
     }
     
-    var nextButtonColor: Color {
-        guard let lastCorrect = lastAnswerCorrect, isCurrentQuestionAnswered else { return .blue }
-        return lastCorrect ? .green : .red
-    }
     
     private var currentQuestionCounts: (multiple: Int, trueFalse: Int) {
         return (item.questions.count, item.trueFalseQuestions?.count ?? 0)
@@ -150,16 +151,12 @@ final class DocumentViewModel {
             questionType: .multipleChoice
         )
         
-        item.answeredQuestions.append(answeredQuestion)
-        item.totalPoints += pointsEarned
-        
+        currentSessionAnsweredQuestions.append(answeredQuestion)
         currentSessionAnswers.insert(currentQuestionIndex)
         lastAnswerCorrect = correct
         
-        if let context = modelContext {
-            context.insert(answeredQuestion)
-            try? context.save()
-        }
+        // Only add to item.answeredQuestions and save when quiz ends
+        // This prevents interference with new quiz sessions
         
         // Auto-advance after 1 second delay
         Task { @MainActor in
@@ -196,16 +193,12 @@ final class DocumentViewModel {
             questionType: .trueFalse
         )
         
-        item.answeredQuestions.append(answeredQuestion)
-        item.totalPoints += pointsEarned
-        
+        currentSessionAnsweredQuestions.append(answeredQuestion)
         currentSessionAnswers.insert(currentQuestionIndex)
         lastAnswerCorrect = correct
         
-        if let context = modelContext {
-            context.insert(answeredQuestion)
-            try? context.save()
-        }
+        // Only add to item.answeredQuestions and save when quiz ends
+        // This prevents interference with new quiz sessions
         
         // Auto-advance after 1 second delay
         Task { @MainActor in
@@ -339,5 +332,53 @@ final class DocumentViewModel {
         
         // Final check to clear waiting state if needed
         clearWaitingStateIfNeeded()
+    }
+    
+    func endQuiz() {
+        // Save all current session answers to the item's permanent storage
+        for answeredQuestion in currentSessionAnsweredQuestions {
+            item.answeredQuestions.append(answeredQuestion)
+            item.totalPoints += answeredQuestion.pointsEarned
+            
+            if let context = modelContext {
+                context.insert(answeredQuestion)
+            }
+        }
+        
+        // Save to database
+        if let context = modelContext {
+            try? context.save()
+        }
+        
+        showingResults = true
+    }
+    
+    func resetQuiz() {
+        hasStartedQuiz = false
+        showingResults = false
+        currentQuestionIndex = 0
+        currentSessionAnswers.removeAll()
+        lastAnswerCorrect = nil
+        isWaitingForNextQuestion = false
+    }
+    
+    var quizResults: (totalQuestions: Int, correctAnswers: Int, totalPoints: Int) {
+        let correctCount = currentSessionAnsweredQuestions.filter { $0.isCorrect }.count
+        let totalPoints = currentSessionAnsweredQuestions.reduce(0) { $0 + $1.pointsEarned }
+        return (currentSessionAnsweredQuestions.count, correctCount, totalPoints)
+    }
+    
+    func getPreviousAnswer(for question: MultipleChoiceQuestion) -> String? {
+        return currentSessionAnsweredQuestions.first(where: { 
+            $0.questionText == question.question && $0.questionType == .multipleChoice 
+        })?.userAnswer
+    }
+    
+    func getPreviousAnswer(for question: TrueFalseQuestion) -> Bool? {
+        guard let userAnswer = currentSessionAnsweredQuestions.first(where: { 
+            $0.questionText == question.question && $0.questionType == .trueFalse 
+        })?.userAnswer else { return nil }
+        
+        return userAnswer == "True"
     }
 }

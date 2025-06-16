@@ -10,9 +10,20 @@ import SwiftUI
 struct MultipleQuestionView: View {
     let question: MultipleChoiceQuestion
     let onQuestionAnswered: (Bool, String) -> Void
+    let previousAnswer: String?
     
     @State private var selectedAnswer: String?
     @State private var hasAnswered = false
+    
+    init(question: MultipleChoiceQuestion, previousAnswer: String? = nil, onQuestionAnswered: @escaping (Bool, String) -> Void) {
+        self.question = question
+        self.previousAnswer = previousAnswer
+        self.onQuestionAnswered = onQuestionAnswered
+        
+        // Initialize state based on previous answer
+        _selectedAnswer = State(initialValue: previousAnswer)
+        _hasAnswered = State(initialValue: previousAnswer != nil)
+    }
     
     var body: some View {
         VStack(spacing: 20) {

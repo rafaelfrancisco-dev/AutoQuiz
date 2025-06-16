@@ -10,9 +10,20 @@ import SwiftUI
 struct TrueFalseQuestionView: View {
     let question: TrueFalseQuestion
     let onQuestionAnswered: (Bool, Bool) -> Void
+    let previousAnswer: Bool?
     
     @State private var selectedAnswer: Bool?
     @State private var hasAnswered = false
+    
+    init(question: TrueFalseQuestion, previousAnswer: Bool? = nil, onQuestionAnswered: @escaping (Bool, Bool) -> Void) {
+        self.question = question
+        self.previousAnswer = previousAnswer
+        self.onQuestionAnswered = onQuestionAnswered
+        
+        // Initialize state based on previous answer
+        _selectedAnswer = State(initialValue: previousAnswer)
+        _hasAnswered = State(initialValue: previousAnswer != nil)
+    }
     
     var body: some View {
         VStack(spacing: 30) {

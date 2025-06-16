@@ -54,6 +54,17 @@ struct DocumentView: View {
         .onDisappear {
             viewModel.stopBackgroundGeneration()
         }
+        .alert("Quiz Results", isPresented: $viewModel.showingResults) {
+            Button("Start New Quiz") {
+                viewModel.resetQuiz()
+            }
+            Button("Cancel") {
+                viewModel.showingResults = false
+            }
+        } message: {
+            let results = viewModel.quizResults
+            Text("Questions answered: \(results.totalQuestions)\nCorrect answers: \(results.correctAnswers)\nPoints earned: \(results.totalPoints)")
+        }
     }
     
     private var hasQuestions: Bool {
@@ -103,9 +114,18 @@ struct DocumentView: View {
     private var quizView: some View {
         ScrollView {
             VStack {
-                pointsDisplay
-                
-                questionTypeToggle
+                HStack {
+                    pointsDisplay
+                    
+                    Spacer()
+                    
+                    Button("End Quiz") {
+                        viewModel.endQuiz()
+                    }
+                    .buttonStyle(.bordered)
+                    .foregroundColor(.red)
+                }
+                .padding(.horizontal)
                 
                 Spacer()
                     .frame(height: 20)
@@ -113,8 +133,10 @@ struct DocumentView: View {
                 if viewModel.selectedQuestionType == .multipleChoice {
                     if !viewModel.item.questions.isEmpty {
                         if viewModel.item.questions.indices.contains(viewModel.currentQuestionIndex) {
-                            MultipleQuestionView(question: viewModel.item.questions[viewModel.currentQuestionIndex]) { isValid, userAnswer in
-                                viewModel.answeredQuestion(question: viewModel.item.questions[viewModel.currentQuestionIndex], correct: isValid, userAnswer: userAnswer)
+                            let question = viewModel.item.questions[viewModel.currentQuestionIndex]
+                            let previousAnswer = viewModel.getPreviousAnswer(for: question)
+                            MultipleQuestionView(question: question, previousAnswer: previousAnswer) { isValid, userAnswer in
+                                viewModel.answeredQuestion(question: question, correct: isValid, userAnswer: userAnswer)
                             }
                             .padding()
                             .id("multiple-\(viewModel.currentQuestionIndex)")
@@ -125,8 +147,10 @@ struct DocumentView: View {
                 } else if viewModel.selectedQuestionType == .trueFalse {
                     if !(viewModel.item.trueFalseQuestions ?? []).isEmpty {
                         if (viewModel.item.trueFalseQuestions ?? []).indices.contains(viewModel.currentQuestionIndex) {
-                            TrueFalseQuestionView(question: viewModel.item.trueFalseQuestions![viewModel.currentQuestionIndex]) { isValid, userAnswer in
-                                viewModel.answeredTrueFalseQuestion(question: viewModel.item.trueFalseQuestions![viewModel.currentQuestionIndex], correct: isValid, userAnswer: userAnswer)
+                            let question = viewModel.item.trueFalseQuestions![viewModel.currentQuestionIndex]
+                            let previousAnswer = viewModel.getPreviousAnswer(for: question)
+                            TrueFalseQuestionView(question: question, previousAnswer: previousAnswer) { isValid, userAnswer in
+                                viewModel.answeredTrueFalseQuestion(question: question, correct: isValid, userAnswer: userAnswer)
                             }
                             .padding()
                             .id("truefalse-\(viewModel.currentQuestionIndex)")
@@ -171,8 +195,6 @@ struct DocumentView: View {
                 .font(.headline)
                 .foregroundColor(.primary)
             
-            Spacer()
-            
             if viewModel.isBackgroundGenerating {
                 HStack(spacing: 4) {
                     ProgressView()
@@ -183,7 +205,6 @@ struct DocumentView: View {
                 }
             }
         }
-        .padding(.horizontal)
     }
     
     private var questionTypeToggle: some View {
@@ -221,14 +242,6 @@ struct DocumentView: View {
                     }
                 }
                 .buttonStyle(.bordered)
-                .controlSize(.large)
-                .foregroundColor(.white)
-                .background(viewModel.nextButtonColor)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(viewModel.nextButtonColor, lineWidth: 2)
-                )
             }
         }
         .padding()
