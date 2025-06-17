@@ -23,7 +23,7 @@ final class DocumentViewModel {
     var hasStartedQuiz = false
     var selectedQuestionType: Question = .multipleChoice
     private var currentSessionAnswers: Set<Int> = []
-    private var currentSessionAnsweredQuestions: [AnsweredQuestion] = []
+    private var currentSessionAnsweredQuestions: [AnsweredQuestionV1] = []
     private var lastAnswerCorrect: Bool?
     var showingResults = false
     
@@ -142,7 +142,7 @@ final class DocumentViewModel {
     func answeredQuestion(question: MultipleChoiceQuestion, correct: Bool, userAnswer: String) {
         let pointsEarned = correct ? 10 : 0
         
-        let answeredQuestion = AnsweredQuestion(
+        let answeredQuestion = AnsweredQuestionV1(
             questionText: question.question,
             userAnswer: userAnswer,
             correctAnswer: question.anwswer,
@@ -184,7 +184,7 @@ final class DocumentViewModel {
     func answeredTrueFalseQuestion(question: TrueFalseQuestion, correct: Bool, userAnswer: Bool) {
         let pointsEarned = correct ? 10 : 0
         
-        let answeredQuestion = AnsweredQuestion(
+        let answeredQuestion = AnsweredQuestionV1(
             questionText: question.question,
             userAnswer: userAnswer ? "True" : "False",
             correctAnswer: question.isTrue ? "True" : "False",

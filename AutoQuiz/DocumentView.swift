@@ -99,6 +99,8 @@ struct DocumentView: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(!hasQuestionsForType(viewModel.selectedQuestionType))
                 .controlSize(.large)
+                
+                Spacer()
             }
             .padding()
             
@@ -135,6 +137,7 @@ struct DocumentView: View {
                         if viewModel.item.questions.indices.contains(viewModel.currentQuestionIndex) {
                             let question = viewModel.item.questions[viewModel.currentQuestionIndex]
                             let previousAnswer = viewModel.getPreviousAnswer(for: question)
+                            
                             MultipleQuestionView(question: question, previousAnswer: previousAnswer) { isValid, userAnswer in
                                 viewModel.answeredQuestion(question: question, correct: isValid, userAnswer: userAnswer)
                             }
@@ -149,6 +152,7 @@ struct DocumentView: View {
                         if (viewModel.item.trueFalseQuestions ?? []).indices.contains(viewModel.currentQuestionIndex) {
                             let question = viewModel.item.trueFalseQuestions![viewModel.currentQuestionIndex]
                             let previousAnswer = viewModel.getPreviousAnswer(for: question)
+                            
                             TrueFalseQuestionView(question: question, previousAnswer: previousAnswer) { isValid, userAnswer in
                                 viewModel.answeredTrueFalseQuestion(question: question, correct: isValid, userAnswer: userAnswer)
                             }

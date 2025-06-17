@@ -32,10 +32,10 @@ struct ContentView: View {
             List(selection: $selectedItemID) {
                 ForEach(items) { item in
                     NavigationLink(value: item.id) {
-                        if !item.content.isEmpty {
-                            Text(item.content.prefix(40) + (item.content.count > 40 ? "..." : ""))
+                        if let title = item.title {
+                            Text(title)
                         } else {
-                            Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+                            Text(item.content.prefix(40))
                         }
                     }
                 }
@@ -77,7 +77,8 @@ struct ContentView: View {
             }
         } detail: {
             if let selID = selectedItemID,
-               let selectedItem = items.first(where: { $0.id == selID }) {
+               let selectedItem = items.first(where: { $0.id == selID })
+            {
                 DocumentView(item: selectedItem)
             } else {
                 Text("Select an item")
@@ -146,19 +147,26 @@ struct ContentView: View {
 #if os(iOS)
 struct DocumentPicker: UIViewControllerRepresentable {
     var completion: (URL?) -> Void
+    
     func makeCoordinator() -> Coordinator { Coordinator(completion: completion) }
+    
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [UTType.plainText, UTType.text, UTType.content, UTType.pdf], asCopy: true)
         picker.delegate = context.coordinator
         return picker
     }
+    
     func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+    
     class Coordinator: NSObject, UIDocumentPickerDelegate {
         let completion: (URL?) -> Void
+        
         init(completion: @escaping (URL?) -> Void) { self.completion = completion }
+        
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
             completion(urls.first)
         }
+        
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
             completion(nil)
         }

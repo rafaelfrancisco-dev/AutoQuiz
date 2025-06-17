@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-typealias Item = SchemaV1.Item
+typealias Item = ItemV1
 
 enum Question: String, Codable, CaseIterable {
     case multipleChoice
@@ -21,27 +21,6 @@ enum SchemaV1: VersionedSchema {
     
     static var models: [any PersistentModel.Type] {
         [Item.self]
-    }
-    
-    @Model
-    final class Item {
-        var timestamp: Date
-        var content: String
-        var title: String?
-        var questions: [MultipleChoiceQuestion]
-        var trueFalseQuestions: [TrueFalseQuestion]?
-        var answeredQuestions: [AnsweredQuestion]
-        var totalPoints: Int
-        
-        init(timestamp: Date, content: String) {
-            self.timestamp = timestamp
-            self.content = content
-            self.title = nil
-            self.questions = []
-            self.trueFalseQuestions = []
-            self.answeredQuestions = []
-            self.totalPoints = 0
-        }
     }
 }
 

@@ -88,7 +88,7 @@ final class Generator {
         let textToPrompt = getRandomContentChunk()
         
         let response = try await session.respond(
-            to: "Create a title for this content with 6 words max: \(textToPrompt)"
+            to: "Create a title for this content with 6 words max, don't add quotes: \(textToPrompt)"
         )
         
         return response.content

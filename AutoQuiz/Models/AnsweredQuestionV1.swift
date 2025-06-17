@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class AnsweredQuestion {
+final class AnsweredQuestionV1 {
     var timestamp: Date
     var questionText: String
     var userAnswer: String
