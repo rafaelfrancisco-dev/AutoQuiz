@@ -11,6 +11,7 @@ import SwiftData
 struct DocumentView: View {
     @State private var viewModel: DocumentViewModel
     @Environment(\.modelContext) private var modelContext
+    @State private var showingHistoricalQuestions = false
     
     init(item: Item) {
         self.viewModel = DocumentViewModel(item: item)
@@ -48,6 +49,34 @@ struct DocumentView: View {
             viewModel.startBackgroundGeneration()
         }
         .navigationTitle(viewModel.item.title ?? viewModel.item.timestamp.description)
+        #if os(macOS)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Button("Question History") {
+                        showingHistoricalQuestions = true
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+            }
+        }
+        #else
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button("Question History") {
+                        showingHistoricalQuestions = true
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+            }
+        }
+        #endif
+        .sheet(isPresented: $showingHistoricalQuestions) {
+            HistoricalQuestionsView(item: viewModel.item)
+        }
         .onAppear {
             viewModel.modelContext = modelContext
         }
@@ -97,14 +126,14 @@ struct DocumentView: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(!hasQuestionsForType(viewModel.selectedQuestionType))
+                .disabled(viewModel.isGenerating)
                 .controlSize(.large)
                 
                 Spacer()
             }
             .padding()
             
-            if !hasQuestionsForType(viewModel.selectedQuestionType) {
+            if !viewModel.isGenerating && !hasQuestionsForType(viewModel.selectedQuestionType) {
                 Text("Generating questions in the background...")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -133,34 +162,26 @@ struct DocumentView: View {
                     .frame(height: 20)
                 
                 if viewModel.selectedQuestionType == .multipleChoice {
-                    if !viewModel.item.questions.isEmpty {
-                        if viewModel.item.questions.indices.contains(viewModel.currentQuestionIndex) {
-                            let question = viewModel.item.questions[viewModel.currentQuestionIndex]
-                            let previousAnswer = viewModel.getPreviousAnswer(for: question)
-                            
-                            MultipleQuestionView(question: question, previousAnswer: previousAnswer) { isValid, userAnswer in
-                                viewModel.answeredQuestion(question: question, correct: isValid, userAnswer: userAnswer)
-                            }
-                            .padding()
-                            .id("multiple-\(viewModel.currentQuestionIndex)")
+                    if !viewModel.item.questions.isEmpty && viewModel.item.questions.indices.contains(viewModel.currentQuestionIndex) {
+                        let question = viewModel.item.questions[viewModel.currentQuestionIndex]
+                        let previousAnswer = viewModel.getPreviousAnswer(for: question)
+                        
+                        MultipleQuestionView(question: question, previousAnswer: previousAnswer) { isValid, userAnswer in
+                            viewModel.answeredQuestion(question: question, correct: isValid, userAnswer: userAnswer)
                         }
-                    } else {
-                        generateQuestionButton
+                        .padding()
+                        .id("multiple-\(viewModel.currentQuestionIndex)")
                     }
                 } else if viewModel.selectedQuestionType == .trueFalse {
-                    if !(viewModel.item.trueFalseQuestions ?? []).isEmpty {
-                        if (viewModel.item.trueFalseQuestions ?? []).indices.contains(viewModel.currentQuestionIndex) {
-                            let question = viewModel.item.trueFalseQuestions![viewModel.currentQuestionIndex]
-                            let previousAnswer = viewModel.getPreviousAnswer(for: question)
-                            
-                            TrueFalseQuestionView(question: question, previousAnswer: previousAnswer) { isValid, userAnswer in
-                                viewModel.answeredTrueFalseQuestion(question: question, correct: isValid, userAnswer: userAnswer)
-                            }
-                            .padding()
-                            .id("truefalse-\(viewModel.currentQuestionIndex)")
+                    if !(viewModel.item.trueFalseQuestions ?? []).isEmpty && (viewModel.item.trueFalseQuestions ?? []).indices.contains(viewModel.currentQuestionIndex) {
+                        let question = viewModel.item.trueFalseQuestions![viewModel.currentQuestionIndex]
+                        let previousAnswer = viewModel.getPreviousAnswer(for: question)
+                        
+                        TrueFalseQuestionView(question: question, previousAnswer: previousAnswer) { isValid, userAnswer in
+                            viewModel.answeredTrueFalseQuestion(question: question, correct: isValid, userAnswer: userAnswer)
                         }
-                    } else {
-                        generateQuestionButton
+                        .padding()
+                        .id("truefalse-\(viewModel.currentQuestionIndex)")
                     }
                 }
                 
@@ -251,47 +272,6 @@ struct DocumentView: View {
         .padding()
     }
     
-    private var generateQuestionButton: some View {
-        VStack {
-            if viewModel.isGenerating {
-                ProgressView()
-            }
-            
-            Button("Generate \(viewModel.selectedQuestionType.rawValue.capitalized) Question") {
-                Task {
-                    withAnimation {
-                        viewModel.isGenerating = true
-                    }
-                    
-                    do {
-                        if viewModel.selectedQuestionType == .multipleChoice {
-                            let results = try await viewModel.generator.generateMultipleChoiceQuestions()
-                            withAnimation {
-                                viewModel.item.questions.append(contentsOf: results)
-                                viewModel.currentQuestionIndex = 0
-                            }
-                        } else {
-                            let results = try await viewModel.generator.generateTrueFalseQuestions()
-                            withAnimation {
-                                if viewModel.item.trueFalseQuestions == nil {
-                                    viewModel.item.trueFalseQuestions = []
-                                }
-                                viewModel.item.trueFalseQuestions?.append(contentsOf: results)
-                                viewModel.currentQuestionIndex = 0
-                            }
-                        }
-                    } catch {
-                        print(error.localizedDescription)
-                    }
-                    
-                    withAnimation {
-                        viewModel.isGenerating = false
-                    }
-                }
-            }
-            .disabled(viewModel.isGenerating)
-        }
-    }
 }
 
 #Preview {
