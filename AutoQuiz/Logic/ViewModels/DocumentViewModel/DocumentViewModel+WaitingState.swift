@@ -9,7 +9,6 @@ import Foundation
 import SwiftUI
 
 extension DocumentViewModel {
-    
     var shouldShowWaitingIndicator: Bool {
         return isWaitingForNextQuestion && isBackgroundGenerating
     }

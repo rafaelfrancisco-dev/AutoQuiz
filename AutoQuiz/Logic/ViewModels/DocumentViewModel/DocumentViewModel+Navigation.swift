@@ -9,7 +9,6 @@ import Foundation
 import SwiftUI
 
 extension DocumentViewModel {
-    
     func switchQuestionType(to type: Question) {
         selectedQuestionType = type
         currentQuestionIndex = 0

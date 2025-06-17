@@ -9,7 +9,6 @@ import Foundation
 import SwiftUI
 
 extension DocumentViewModel {
-    
     func answeredQuestion(question: MultipleChoiceQuestion, correct: Bool, userAnswer: String) {
         let pointsEarned = correct ? 10 : 0
         

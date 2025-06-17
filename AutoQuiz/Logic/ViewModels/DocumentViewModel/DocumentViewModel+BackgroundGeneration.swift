@@ -10,7 +10,6 @@ import SwiftUI
 import SwiftData
 
 extension DocumentViewModel {
-    
     func startBackgroundGeneration() {
         backgroundGenerationTask?.cancel()
         

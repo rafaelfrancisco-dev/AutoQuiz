@@ -9,7 +9,6 @@ import Foundation
 import SwiftData
 
 extension DocumentViewModel {
-    
     func startQuiz() {
         hasStartedQuiz = true
         currentQuestionIndex = 0
