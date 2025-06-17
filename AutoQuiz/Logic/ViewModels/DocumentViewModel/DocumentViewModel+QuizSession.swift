@@ -22,9 +22,9 @@ extension DocumentViewModel {
     
     func endQuiz() {
         // Save all current session answers to the item's permanent storage
+        // Points are no longer persisted - they reset after each quiz
         for answeredQuestion in currentSessionAnsweredQuestions {
             item.answeredQuestions.append(answeredQuestion)
-            item.totalPoints += answeredQuestion.pointsEarned
             
             if let context = modelContext {
                 context.insert(answeredQuestion)
@@ -44,6 +44,7 @@ extension DocumentViewModel {
         showingResults = false
         currentQuestionIndex = 0
         currentSessionAnswers.removeAll()
+        currentSessionAnsweredQuestions.removeAll() // Reset points by clearing answered questions
         lastAnswerCorrect = nil
         isWaitingForNextQuestion = false
     }

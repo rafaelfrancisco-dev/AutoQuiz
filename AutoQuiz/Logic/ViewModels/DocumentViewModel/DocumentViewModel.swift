@@ -38,7 +38,8 @@ final class DocumentViewModel {
     
     // MARK: - Computed Properties
     var currentPoints: Int {
-        return item.totalPoints
+        // Points are now calculated from current session only
+        return currentSessionAnsweredQuestions.reduce(0) { $0 + $1.pointsEarned }
     }
     
     // MARK: - Initialization
