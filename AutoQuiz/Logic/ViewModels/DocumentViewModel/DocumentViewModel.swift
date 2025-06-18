@@ -26,10 +26,12 @@ final class DocumentViewModel {
     // MARK: - Quiz State
     var hasStartedQuiz = false
     var selectedQuestionType: Question = .multipleChoice
+    var currentQuizSettings = QuizSettings.default
     
     // MARK: - Internal State (accessed by extensions)
     internal var currentSessionAnswers: Set<Int> = []
     internal var currentSessionAnsweredQuestions: [AnsweredQuestionV1] = []
+    internal var currentSessionQuestions: [QuizQuestion] = []
     internal var lastAnswerCorrect: Bool?
     internal var isWaitingForNextQuestion = false
     internal var lastKnownQuestionCount: (multiple: Int, trueFalse: Int) = (0, 0)

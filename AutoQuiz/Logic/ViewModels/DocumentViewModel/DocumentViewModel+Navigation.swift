@@ -23,12 +23,17 @@ extension DocumentViewModel {
     }
     
     var canNavigateToNext: Bool {
-        let maxIndex = selectedQuestionType == .multipleChoice ?
-            item.questions.count - 1 :
-            (item.trueFalseQuestions?.count ?? 0) - 1
+        // Use session questions if quiz has started, otherwise use original logic
+        let maxIndex = hasStartedQuiz ? 
+            currentSessionQuestions.count - 1 :
+            (selectedQuestionType == .multipleChoice ?
+                item.questions.count - 1 :
+                (item.trueFalseQuestions?.count ?? 0) - 1)
         
-        // Only show next button when viewing a past answered question (for navigation)
-        return currentQuestionIndex < maxIndex && isCurrentQuestionAnswered
+        // Allow skipping if enabled, otherwise only show next when answered
+        let canAdvance = currentQuizSettings.allowSkipQuestions || isCurrentQuestionAnswered
+        
+        return currentQuestionIndex < maxIndex && canAdvance
     }
     
     var currentQuestionCounts: (multiple: Int, trueFalse: Int) {
@@ -36,12 +41,24 @@ extension DocumentViewModel {
     }
     
     var maxAvailableIndex: Int {
-        return selectedQuestionType == .multipleChoice ?
-            item.questions.count - 1 :
-            (item.trueFalseQuestions?.count ?? 0) - 1
+        // Use session questions if quiz has started, otherwise use original logic
+        return hasStartedQuiz ? 
+            currentSessionQuestions.count - 1 :
+            (selectedQuestionType == .multipleChoice ?
+                item.questions.count - 1 :
+                (item.trueFalseQuestions?.count ?? 0) - 1)
     }
     
     var isAtLastAvailableQuestion: Bool {
         return currentQuestionIndex == maxAvailableIndex
+    }
+    
+    func getCurrentSessionQuestion() -> QuizQuestion? {
+        guard hasStartedQuiz,
+              currentQuestionIndex < currentSessionQuestions.count else {
+            return nil
+        }
+        
+        return currentSessionQuestions[currentQuestionIndex]
     }
 }

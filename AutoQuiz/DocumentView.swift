@@ -14,6 +14,7 @@ struct DocumentView: View {
     
     @State private var viewModel: DocumentViewModel
     @State private var showingHistoricalQuestions = false
+    @State private var showingQuizOptions = false
     
     init(item: Item) {
         self.viewModel = DocumentViewModel(item: item)
@@ -79,6 +80,13 @@ struct DocumentView: View {
         .sheet(isPresented: $showingHistoricalQuestions) {
             HistoricalQuestionsView(item: viewModel.item)
         }
+        .sheet(isPresented: $showingQuizOptions) {
+            QuizOptionsView { settings in
+                withAnimation {
+                    viewModel.startQuiz(with: settings)
+                }
+            }
+        }
         .onAppear {
             viewModel.modelContext = modelContext
         }
@@ -123,9 +131,7 @@ struct DocumentView: View {
                 .pickerStyle(.segmented)
                 
                 Button("Start Quiz") {
-                    withAnimation {
-                        viewModel.startQuiz()
-                    }
+                    showingQuizOptions = true
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(viewModel.isGenerating)
@@ -163,9 +169,9 @@ struct DocumentView: View {
                 Spacer()
                     .frame(height: 20)
                 
-                if viewModel.selectedQuestionType == .multipleChoice {
-                    if !viewModel.item.questions.isEmpty && viewModel.item.questions.indices.contains(viewModel.currentQuestionIndex) {
-                        let question = viewModel.item.questions[viewModel.currentQuestionIndex]
+                if let currentSessionQuestion = viewModel.getCurrentSessionQuestion() {
+                    switch currentSessionQuestion {
+                    case .multipleChoice(let question, _):
                         let previousAnswer = viewModel.getPreviousAnswer(for: question)
                         
                         MultipleQuestionView(question: question, previousAnswer: previousAnswer) { isValid, userAnswer in
@@ -173,10 +179,8 @@ struct DocumentView: View {
                         }
                         .padding()
                         .id("multiple-\(viewModel.currentQuestionIndex)")
-                    }
-                } else if viewModel.selectedQuestionType == .trueFalse {
-                    if !(viewModel.item.trueFalseQuestions ?? []).isEmpty && (viewModel.item.trueFalseQuestions ?? []).indices.contains(viewModel.currentQuestionIndex) {
-                        let question = viewModel.item.trueFalseQuestions![viewModel.currentQuestionIndex]
+                        
+                    case .trueFalse(let question, _):
                         let previousAnswer = viewModel.getPreviousAnswer(for: question)
                         
                         TrueFalseQuestionView(question: question, previousAnswer: previousAnswer) { isValid, userAnswer in
@@ -184,6 +188,31 @@ struct DocumentView: View {
                         }
                         .padding()
                         .id("truefalse-\(viewModel.currentQuestionIndex)")
+                    }
+                } else {
+                    // Fallback to original logic for non-session quiz
+                    if viewModel.selectedQuestionType == .multipleChoice {
+                        if !viewModel.item.questions.isEmpty && viewModel.item.questions.indices.contains(viewModel.currentQuestionIndex) {
+                            let question = viewModel.item.questions[viewModel.currentQuestionIndex]
+                            let previousAnswer = viewModel.getPreviousAnswer(for: question)
+                            
+                            MultipleQuestionView(question: question, previousAnswer: previousAnswer) { isValid, userAnswer in
+                                viewModel.answeredQuestion(question: question, correct: isValid, userAnswer: userAnswer)
+                            }
+                            .padding()
+                            .id("multiple-\(viewModel.currentQuestionIndex)")
+                        }
+                    } else if viewModel.selectedQuestionType == .trueFalse {
+                        if !(viewModel.item.trueFalseQuestions ?? []).isEmpty && (viewModel.item.trueFalseQuestions ?? []).indices.contains(viewModel.currentQuestionIndex) {
+                            let question = viewModel.item.trueFalseQuestions![viewModel.currentQuestionIndex]
+                            let previousAnswer = viewModel.getPreviousAnswer(for: question)
+                            
+                            TrueFalseQuestionView(question: question, previousAnswer: previousAnswer) { isValid, userAnswer in
+                                viewModel.answeredTrueFalseQuestion(question: question, correct: isValid, userAnswer: userAnswer)
+                            }
+                            .padding()
+                            .id("truefalse-\(viewModel.currentQuestionIndex)")
+                        }
                     }
                 }
                 
