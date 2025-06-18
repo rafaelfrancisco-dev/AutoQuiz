@@ -17,6 +17,60 @@ struct HistoricalQuestionsView: View {
     }
     
     var body: some View {
+        #if os(macOS)
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Spacer()
+                
+                Text("Question History")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                
+                Spacer()
+                
+                Button("Done") {
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding()
+            .background(Color(NSColor.windowBackgroundColor))
+            
+            Divider()
+            
+            // Content
+            Group {
+                if sortedAnsweredQuestions.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "questionmark.circle")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        
+                        Text("No Questions Answered")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        
+                        Text("Start a quiz to see your answered questions history here.")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding()
+                } else {
+                    List {
+                        ForEach(sortedAnsweredQuestions, id: \.timestamp) { answeredQuestion in
+                            HistoricalQuestionRow(answeredQuestion: answeredQuestion)
+                                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        }
+                    }
+                    .listStyle(.plain)
+                }
+            }
+            .frame(minWidth: 600, minHeight: 400)
+        }
+        #else
         NavigationStack {
             Group {
                 if sortedAnsweredQuestions.isEmpty {
@@ -34,7 +88,6 @@ struct HistoricalQuestionsView: View {
                 }
             }
             .navigationTitle("Question History")
-            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -43,8 +96,8 @@ struct HistoricalQuestionsView: View {
                     }
                 }
             }
-            #endif
         }
+        #endif
     }
 }
 

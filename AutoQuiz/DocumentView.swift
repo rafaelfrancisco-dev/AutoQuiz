@@ -15,6 +15,7 @@ struct DocumentView: View {
     @State private var viewModel: DocumentViewModel
     @State private var showingHistoricalQuestions = false
     @State private var showingQuizOptions = false
+    @State private var showingAddContent = false
     
     init(item: Item) {
         self.viewModel = DocumentViewModel(item: item)
@@ -56,6 +57,12 @@ struct DocumentView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
+                    Button("Add Content") {
+                        showingAddContent = true
+                    }
+                    
+                    Divider()
+                    
                     Button("Question History") {
                         showingHistoricalQuestions = true
                     }
@@ -68,6 +75,12 @@ struct DocumentView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
+                    Button("Add Content") {
+                        showingAddContent = true
+                    }
+                    
+                    Divider()
+                    
                     Button("Question History") {
                         showingHistoricalQuestions = true
                     }
@@ -86,6 +99,9 @@ struct DocumentView: View {
                     viewModel.startQuiz(with: settings)
                 }
             }
+        }
+        .sheet(isPresented: $showingAddContent) {
+            AddContentView(item: viewModel.item)
         }
         .onAppear {
             viewModel.modelContext = modelContext
