@@ -7,8 +7,10 @@
 
 import Foundation
 import SwiftData
+import OSLog
 
 typealias Item = ItemV2
+typealias AnsweredQuestion = AnsweredQuestionV1
 
 enum Question: String, Codable, CaseIterable {
     case multipleChoice
@@ -48,10 +50,10 @@ enum ItemMigrationPlan: SchemaMigrationPlan {
         willMigrate: { context in
             // Migration from V1 to V2: Remove totalPoints field
             // SwiftData will automatically handle field removal
-            print("Starting migration from V1 to V2 - removing totalPoints field")
+            Logger.database.info("Starting migration from V1 to V2 - removing totalPoints field")
         },
         didMigrate: { context in
-            print("Completed migration from V1 to V2")
+            Logger.database.info("Completed migration from V1 to V2")
         }
     )
 }

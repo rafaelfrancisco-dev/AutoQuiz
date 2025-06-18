@@ -7,10 +7,12 @@
 
 import SwiftUI
 import SwiftData
+import OSLog
 
 struct DocumentView: View {
-    @State private var viewModel: DocumentViewModel
     @Environment(\.modelContext) private var modelContext
+    
+    @State private var viewModel: DocumentViewModel
     @State private var showingHistoricalQuestions = false
     
     init(item: Item) {
@@ -18,7 +20,7 @@ struct DocumentView: View {
     }
     
     var body: some View {
-        VStack {
+        List {
             if viewModel.hasStartedQuiz {
                 quizView
             } else {
@@ -38,7 +40,7 @@ struct DocumentView: View {
                         viewModel.item.title = title
                     }
                 } catch {
-                    print(error.localizedDescription)
+                    Logger.error.error("Failed to generate title: \(error.localizedDescription)")
                 }
                 
                 withAnimation {
@@ -87,12 +89,12 @@ struct DocumentView: View {
             Button("Start New Quiz") {
                 viewModel.resetQuiz()
             }
+            
             Button("Cancel") {
                 viewModel.showingResults = false
             }
         } message: {
-            let results = viewModel.quizResults
-            Text("Questions answered: \(results.totalQuestions)\nCorrect answers: \(results.correctAnswers)\nPoints earned: \(results.totalPoints)")
+            Text("Questions answered: \(viewModel.quizResults.totalQuestions)\nCorrect answers: \(viewModel.quizResults.correctAnswers)\nPoints earned: \(viewModel.quizResults.totalPoints)")
         }
     }
     
@@ -192,6 +194,7 @@ struct DocumentView: View {
                     HStack {
                         ProgressView()
                             .scaleEffect(0.8)
+                        
                         Text("Generating next question...")
                             .font(.caption)
                             .foregroundColor(.secondary)

@@ -17,7 +17,7 @@ struct HistoricalQuestionsView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Group {
                 if sortedAnsweredQuestions.isEmpty {
                     ContentUnavailableView(
@@ -36,8 +36,6 @@ struct HistoricalQuestionsView: View {
             .navigationTitle("Question History")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
-            #endif
-            #if os(iOS)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
@@ -117,6 +115,7 @@ struct HistoricalQuestionRow: View {
 
 #Preview {
     let sampleItem = Item(timestamp: .now, content: "Sample content")
+    
     sampleItem.answeredQuestions = [
         AnsweredQuestionV1(
             questionText: "What is the capital of France?",

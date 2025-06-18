@@ -10,21 +10,7 @@ import SwiftData
 
 @main
 struct AutoQuizApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
-    
-    // Migration-ready container (use this when you need to migrate)
-    static var migrationModelContainer: ModelContainer = {
+    private var migrationModelContainer: ModelContainer = {
         do {
             return try ModelContainer(for: Item.self, migrationPlan: ItemMigrationPlan.self)
         } catch {
@@ -36,6 +22,6 @@ struct AutoQuizApp: App {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(sharedModelContainer)
+        .modelContainer(migrationModelContainer)
     }
 }

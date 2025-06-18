@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import SwiftData
+import OSLog
 
 extension DocumentViewModel {
     func startBackgroundGeneration() {
@@ -29,7 +30,7 @@ extension DocumentViewModel {
     private func generateBackgroundQuestions() async {
         guard backgroundGenerationTask?.isCancelled == false else { return }
         
-        print("DEBUG: Starting background generation")
+        Logger.generation.debug("Starting background generation")
         isBackgroundGenerating = true
         
         // Initial generation to ensure we have questions for both types
@@ -44,20 +45,20 @@ extension DocumentViewModel {
             if selectedQuestionType == .multipleChoice {
                 currentTypeUnanswered = max(0, multipleChoiceCount - (currentQuestionIndex + 1))
                 needMore = currentTypeUnanswered < maxBackgroundQuestions
-                print("DEBUG: Background generation loop - Multiple choice active: \(multipleChoiceCount) total, \(currentTypeUnanswered) unanswered, need more: \(needMore)")
+                Logger.generation.debug("Background generation loop - Multiple choice active")
             } else {
                 currentTypeUnanswered = max(0, trueFalseCount - (currentQuestionIndex + 1))
                 needMore = currentTypeUnanswered < maxBackgroundQuestions
-                print("DEBUG: Background generation loop - True/False active: \(trueFalseCount) total, \(currentTypeUnanswered) unanswered, need more: \(needMore)")
+                Logger.generation.debug("Background generation loop - True/False active")
             }
             
             let needMoreMultiple = selectedQuestionType == .multipleChoice && needMore
             let needMoreTrueFalse = selectedQuestionType == .trueFalse && needMore
             
-            print("DEBUG: needMoreMultiple: \(needMoreMultiple), needMoreTrueFalse: \(needMoreTrueFalse)")
+            Logger.generation.debug("Checking if more questions needed")
             
             if !needMoreMultiple && !needMoreTrueFalse {
-                print("DEBUG: Enough questions, sleeping...")
+                Logger.generation.debug("Enough questions, sleeping...")
                 isBackgroundGenerating = false
                 try? await Task.sleep(nanoseconds: 5_000_000_000)
                 continue
@@ -97,14 +98,14 @@ extension DocumentViewModel {
                 item.questions.append(contentsOf: questions)
             }
             
-            print("DEBUG: Generated \(questions.count) multiple choice questions, total count now: \(item.questions.count)")
+            Logger.generation.info("Generated multiple choice questions")
             
             // Check if user is waiting for next question and auto-advance
             checkForNewQuestionsAndAutoAdvance()
             
             try? modelContext?.save()
         } catch {
-            print("Background generation error (multiple choice): \(error)")
+            Logger.error.error("Background generation error (multiple choice): \(error)")
             try? await Task.sleep(nanoseconds: 2_000_000_000)
         }
     }
@@ -122,14 +123,14 @@ extension DocumentViewModel {
                 item.trueFalseQuestions?.append(contentsOf: questions)
             }
             
-            print("DEBUG: Generated \(questions.count) true/false questions, total count now: \(item.trueFalseQuestions?.count ?? 0)")
+            Logger.generation.info("Generated true/false questions")
             
             // Check if user is waiting for next question and auto-advance
             checkForNewQuestionsAndAutoAdvance()
             
             try? modelContext?.save()
         } catch {
-            print("Background generation error (true/false): \(error)")
+            Logger.error.error("Background generation error (true/false): \(error)")
             try? await Task.sleep(nanoseconds: 2_000_000_000)
         }
     }

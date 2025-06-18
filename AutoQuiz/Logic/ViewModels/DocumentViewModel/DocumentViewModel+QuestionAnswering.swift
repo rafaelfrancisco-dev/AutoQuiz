@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import OSLog
 
 extension DocumentViewModel {
     func answeredQuestion(question: MultipleChoiceQuestion, correct: Bool, userAnswer: String) {
@@ -58,20 +59,20 @@ extension DocumentViewModel {
     }
     
     private func handleAutoAdvanceAfterAnswer() {
-        print("DEBUG: Auto-advance logic - canNavigateToNext: \(canNavigateToNext), isAtLast: \(isAtLastAvailableQuestion), isAnswered: \(isCurrentQuestionAnswered)")
+        Logger.quiz.debug("Auto-advance logic - canNavigateToNext: \(self.canNavigateToNext), isAtLast: \(self.isAtLastAvailableQuestion), isAnswered: \(self.isCurrentQuestionAnswered)")
         
         if canNavigateToNext {
-            print("DEBUG: Auto-advancing to next existing question")
+            Logger.quiz.debug("Auto-advancing to next existing question")
             withAnimation {
                 currentQuestionIndex += 1
                 lastAnswerCorrect = nil
                 isWaitingForNextQuestion = false
             }
         } else if isAtLastAvailableQuestion && isCurrentQuestionAnswered {
-            print("DEBUG: Setting waiting state - last question answered")
+            Logger.quiz.debug("Setting waiting state - last question answered")
             isWaitingForNextQuestion = true
             lastKnownQuestionCount = currentQuestionCounts
-            print("DEBUG: Waiting state set - lastKnownQuestionCount: \(lastKnownQuestionCount)")
+            Logger.quiz.debug("Waiting state set - lastKnownQuestionCount set")
         }
     }
     

@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import OSLog
 
 extension DocumentViewModel {
     var shouldShowWaitingIndicator: Bool {
@@ -16,16 +17,16 @@ extension DocumentViewModel {
     func clearWaitingStateIfNeeded() {
         // Failsafe: if we're waiting but have available questions, clear waiting state
         if isWaitingForNextQuestion && !isAtLastAvailableQuestion {
-            print("DEBUG: Clearing waiting state - questions are available")
+            Logger.viewModel.debug("Clearing waiting state - questions are available")
             isWaitingForNextQuestion = false
         }
     }
     
     func checkForNewQuestionsAndAutoAdvance() {
-        print("DEBUG: checkForNewQuestionsAndAutoAdvance called - isWaiting: \(isWaitingForNextQuestion)")
+        Logger.viewModel.debug("checkForNewQuestionsAndAutoAdvance called - isWaiting: \(self.isWaitingForNextQuestion)")
         
         guard isWaitingForNextQuestion else { 
-            print("DEBUG: Not waiting for next question, returning early")
+            Logger.viewModel.debug("Not waiting for next question, returning early")
             return 
         }
         
@@ -38,10 +39,10 @@ extension DocumentViewModel {
             hasNewQuestions = currentCounts.trueFalse > lastKnownQuestionCount.trueFalse
         }
         
-        print("DEBUG: Checking for new questions - Current: \(currentCounts), Last Known: \(lastKnownQuestionCount), Has New: \(hasNewQuestions)")
+        Logger.viewModel.debug("Checking for new questions - Has New: \(hasNewQuestions)")
         
         if hasNewQuestions {
-            print("DEBUG: Auto-advancing to new question")
+            Logger.viewModel.debug("Auto-advancing to new question")
             // New question available, auto-advance to it
             withAnimation {
                 currentQuestionIndex += 1
@@ -49,7 +50,7 @@ extension DocumentViewModel {
                 lastAnswerCorrect = nil
             }
         } else {
-            print("DEBUG: No new questions available yet")
+            Logger.viewModel.debug("No new questions available yet")
         }
     }
 }
