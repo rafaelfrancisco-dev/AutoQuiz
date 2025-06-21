@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(xcodebuild:*)"
+      "Bash(xcodebuild:*)",
+      "WebFetch(domain:www.hackingwithswift.com)",
+      "WebFetch(domain:developer.apple.com)"
     ],
     "deny": []
   }

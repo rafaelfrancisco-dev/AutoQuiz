@@ -61,6 +61,16 @@ extension DocumentViewModel {
     private func handleAutoAdvanceAfterAnswer() {
         Logger.quiz.debug("Auto-advance logic - canNavigateToNext: \(self.canNavigateToNext), isAtLast: \(self.isAtLastAvailableQuestion), isAnswered: \(self.isCurrentQuestionAnswered)")
         
+        // Check if we've reached the maximum questions for non-unlimited quizzes
+        let hasReachedMaxQuestions = !self.currentQuizSettings.isUnlimitedQuestions && 
+                                   self.currentSessionAnsweredQuestions.count >= self.currentQuizSettings.maxQuestions
+        
+        if hasReachedMaxQuestions {
+            Logger.quiz.debug("Reached maximum questions (\(self.currentQuizSettings.maxQuestions)) - auto-ending quiz")
+            self.endQuiz()
+            return
+        }
+        
         if canNavigateToNext {
             Logger.quiz.debug("Auto-advancing to next existing question")
             withAnimation {
