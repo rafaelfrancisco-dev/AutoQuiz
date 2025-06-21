@@ -43,14 +43,9 @@ struct MultipleQuestionView: View {
                         }
                     }
                     .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(buttonBackgroundColor(for: option))
-                    .foregroundColor(buttonTextColor(for: option))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(hasAnswered ? .clear : .gray, lineWidth: 1)
-                    )
+                    .buttonStyle(.glass)
+                    .controlSize(.large)
+                    .tint(buttonTintColor(for: option))
                     .disabled(hasAnswered)
                 }
             }
@@ -58,27 +53,15 @@ struct MultipleQuestionView: View {
         }
     }
     
-    private func buttonTextColor(for option: String) -> Color {
-        guard hasAnswered else { return .primary }
-        
-        if option == question.anwswer {
-            return .white
-        } else if option == selectedAnswer {
-            return .white
-        } else {
-            return .secondary
-        }
-    }
-    
-    private func buttonBackgroundColor(for option: String) -> Color {
-        guard hasAnswered else { return .gray.opacity(0.1) }
+    private func buttonTintColor(for option: String) -> Color {
+        guard hasAnswered else { return .blue }
         
         if option == question.anwswer {
             return .green
         } else if option == selectedAnswer {
             return .red
         } else {
-            return .gray.opacity(0.3)
+            return .gray
         }
     }
 }

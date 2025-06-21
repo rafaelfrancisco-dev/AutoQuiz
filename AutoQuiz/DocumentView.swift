@@ -129,12 +129,7 @@ struct DocumentView: View {
     @ViewBuilder
     private var startView: some View {
         VStack(spacing: 30) {
-            if viewModel.isGenerating {
-                ProgressView()
-                    .padding()
-            }
-            
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text("Choose Question Type")
                     .font(.title2)
                     .fontWeight(.semibold)
@@ -146,14 +141,19 @@ struct DocumentView: View {
                 }
                 .pickerStyle(.segmented)
                 
-                Button("Start Quiz") {
-                    showingQuizOptions = true
+                Spacer()
+                
+                Button {
+                    withAnimation {
+                        showingQuizOptions = true
+                    }
+                } label: {
+                    Text("Start Quiz")
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(viewModel.isGenerating)
                 .controlSize(.large)
-                
-                Spacer()
             }
             .padding()
             
@@ -180,7 +180,6 @@ struct DocumentView: View {
                     .buttonStyle(.bordered)
                     .foregroundColor(.red)
                 }
-                .padding(.horizontal)
                 
                 Spacer()
                     .frame(height: 20)
@@ -248,7 +247,6 @@ struct DocumentView: View {
                 }
                 
                 navigationControls
-                    .padding(.bottom, 20)
             }
         }
     }

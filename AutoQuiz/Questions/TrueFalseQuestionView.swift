@@ -42,13 +42,9 @@ struct TrueFalseQuestionView: View {
                     }
                 }
                 .frame(width: 120, height: 50)
-                .background(buttonBackgroundColor(for: true))
-                .foregroundColor(buttonTextColor(for: true))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(hasAnswered ? .clear : .gray, lineWidth: 1)
-                )
+                .buttonStyle(.glass)
+                .controlSize(.large)
+                .tint(buttonTintColor(for: true))
                 .disabled(hasAnswered)
                 
                 Button("False") {
@@ -60,39 +56,23 @@ struct TrueFalseQuestionView: View {
                     }
                 }
                 .frame(width: 120, height: 50)
-                .background(buttonBackgroundColor(for: false))
-                .foregroundColor(buttonTextColor(for: false))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(hasAnswered ? .clear : .gray, lineWidth: 1)
-                )
+                .buttonStyle(.glass)
+                .controlSize(.large)
+                .tint(buttonTintColor(for: false))
                 .disabled(hasAnswered)
             }
         }
     }
     
-    private func buttonTextColor(for answer: Bool) -> Color {
-        guard hasAnswered else { return .primary }
-        
-        if answer == question.isTrue {
-            return .white
-        } else if answer == selectedAnswer {
-            return .white
-        } else {
-            return .secondary
-        }
-    }
-    
-    private func buttonBackgroundColor(for answer: Bool) -> Color {
-        guard hasAnswered else { return .gray.opacity(0.1) }
+    private func buttonTintColor(for answer: Bool) -> Color {
+        guard hasAnswered else { return .blue }
         
         if answer == question.isTrue {
             return .green
         } else if answer == selectedAnswer {
             return .red
         } else {
-            return .gray.opacity(0.3)
+            return .gray
         }
     }
 }
