@@ -172,5 +172,11 @@ extension DocumentViewModel {
         }
         
         Logger.generation.debug("Added \(newQuestions.count) new questions to active session")
+        
+        // Notify navigation system that new questions are available
+        if isWaitingForNextQuestion {
+            Logger.generation.debug("Auto-advancing to newly generated question")
+            navigateToNextQuestion()
+        }
     }
 }

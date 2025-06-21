@@ -25,51 +25,14 @@ extension DocumentViewModel {
     func checkForNewQuestionsAndAutoAdvance() {
         Logger.viewModel.debug("checkForNewQuestionsAndAutoAdvance called - isWaiting: \(self.isWaitingForNextQuestion)")
         
-        guard isWaitingForNextQuestion else { 
-            Logger.viewModel.debug("Not waiting for next question, returning early")
+        // This method is now simplified - background generator handles auto-advance notification
+        guard isWaitingForNextQuestion && canNavigateToNext else { 
+            Logger.viewModel.debug("Not waiting or no questions available")
             return 
         }
         
-        // For session-based quizzes, check if new questions were added to currentSessionQuestions
-        if hasStartedQuiz {
-            let currentSessionCount = currentSessionQuestions.count
-            let hasNewSessionQuestions = currentQuestionIndex < currentSessionCount - 1
-            
-            Logger.viewModel.debug("Session mode - currentIndex: \(self.currentQuestionIndex), sessionCount: \(currentSessionCount), hasNew: \(hasNewSessionQuestions)")
-            
-            if hasNewSessionQuestions {
-                Logger.viewModel.debug("Auto-advancing to new session question")
-                withAnimation {
-                    currentQuestionIndex += 1
-                    isWaitingForNextQuestion = false
-                    lastAnswerCorrect = nil
-                }
-                return
-            }
-        }
-        
-        // Fallback to original logic for non-session quizzes
-        let currentCounts = currentQuestionCounts
-        let hasNewQuestions: Bool
-        
-        if selectedQuestionType == .multipleChoice {
-            hasNewQuestions = currentCounts.multiple > lastKnownQuestionCount.multiple
-        } else {
-            hasNewQuestions = currentCounts.trueFalse > lastKnownQuestionCount.trueFalse
-        }
-        
-        Logger.viewModel.debug("Checking for new questions - Has New: \(hasNewQuestions)")
-        
-        if hasNewQuestions {
-            Logger.viewModel.debug("Auto-advancing to new question")
-            // New question available, auto-advance to it
-            withAnimation {
-                currentQuestionIndex += 1
-                isWaitingForNextQuestion = false
-                lastAnswerCorrect = nil
-            }
-        } else {
-            Logger.viewModel.debug("No new questions available yet")
-        }
+        // Navigate if we have questions available
+        Logger.viewModel.debug("Auto-advancing to next question")
+        navigateToNextQuestion()
     }
 }

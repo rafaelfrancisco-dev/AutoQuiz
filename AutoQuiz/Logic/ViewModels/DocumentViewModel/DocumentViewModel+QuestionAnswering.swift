@@ -27,7 +27,7 @@ extension DocumentViewModel {
         // Auto-advance after brief delay for UI feedback
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-            startContinuousAutoAdvance()
+            await handleAutoAdvanceAfterAnswer()
         }
     }
     
@@ -48,7 +48,7 @@ extension DocumentViewModel {
         // Auto-advance after brief delay for UI feedback
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-            startContinuousAutoAdvance()
+            await handleAutoAdvanceAfterAnswer()
         }
     }
     
@@ -58,61 +58,90 @@ extension DocumentViewModel {
         lastAnswerCorrect = answeredQuestion.isCorrect
     }
     
-    private func startContinuousAutoAdvance() {
-        // Check if we've reached the maximum questions for non-unlimited quizzes
-        let hasReachedMaxQuestions = !self.currentQuizSettings.isUnlimitedQuestions && 
-                                   self.currentSessionAnsweredQuestions.count >= self.currentQuizSettings.maxQuestions
+    @MainActor
+    private func handleAutoAdvanceAfterAnswer() async {
+        Logger.quiz.debug("Handling auto-advance after answer")
         
-        if hasReachedMaxQuestions {
-            Logger.quiz.debug("Reached maximum questions (\(self.currentQuizSettings.maxQuestions)) - auto-ending quiz")
+        // Case 3: Check if we've reached the maximum questions (quiz should end)
+        if !self.currentQuizSettings.isUnlimitedQuestions && 
+           self.currentSessionAnsweredQuestions.count >= self.currentQuizSettings.maxQuestions {
+            Logger.quiz.debug("Reached maximum questions (\(self.currentQuizSettings.maxQuestions)) - ending quiz")
+            try? await Task.sleep(nanoseconds: 1_000_000_000) // Brief delay for UI feedback
             self.endQuiz()
             return
         }
         
-        // Start the continuous auto-advance loop
-        Task { @MainActor in
-            await continuouslyTryToAdvance()
+        // Case 1: Question is already prepared - navigate immediately
+        if canNavigateToNext {
+            Logger.quiz.debug("Next question ready - navigating immediately")
+            navigateToNextQuestion()
+            return
+        }
+        
+        // Case 2: Need to wait for generator - set waiting state and let generator notify us
+        Logger.quiz.debug("No next question available - waiting for background generation")
+        isWaitingForNextQuestion = true
+        
+        // Ensure background generation is running (it will notify us when ready)
+        if !isBackgroundGenerating {
+            startBackgroundGeneration()
         }
     }
     
     @MainActor
-    private func continuouslyTryToAdvance() async {
-        Logger.quiz.debug("Starting continuous auto-advance loop")
-        
-        // Ensure background generation is running
-        if !isBackgroundGenerating {
-            startBackgroundGeneration()
+    func navigateToNextQuestion() {
+        guard canNavigateToNext else {
+            Logger.quiz.warning("Attempted to navigate but no next question available")
+            return
         }
         
-        // Keep trying to advance until we succeed or reach max questions
-        while true {
-            // Check if max questions reached
-            let hasReachedMaxQuestions = !self.currentQuizSettings.isUnlimitedQuestions && 
-                                       self.currentSessionAnsweredQuestions.count >= self.currentQuizSettings.maxQuestions
+        withAnimation {
+            currentQuestionIndex += 1
+            lastAnswerCorrect = nil
+            isWaitingForNextQuestion = false
+        }
+        
+        Logger.quiz.debug("Successfully navigated to question \(self.currentQuestionIndex)")
+        
+        // Check if we landed on a pre-answered question and continue auto-advancing
+        skipPreAnsweredQuestions()
+    }
+    
+    @MainActor
+    private func skipPreAnsweredQuestions() {
+        // Keep advancing through pre-answered questions until we find an unanswered one
+        // or reach the end/limit
+        while isCurrentQuestionAnswered && canNavigateToNext {
+            Logger.quiz.debug("Skipping pre-answered question at index \(self.currentQuestionIndex)")
             
-            if hasReachedMaxQuestions {
-                Logger.quiz.debug("Reached maximum questions - ending quiz")
-                self.endQuiz()
+            // Check if we've reached the maximum questions for non-unlimited quizzes
+            if !currentQuizSettings.isUnlimitedQuestions && 
+               currentSessionAnsweredQuestions.count >= currentQuizSettings.maxQuestions {
+                Logger.quiz.debug("Reached maximum questions while skipping - ending quiz")
+                endQuiz()
                 return
             }
             
-            // Try to advance
-            if canNavigateToNext {
-                Logger.quiz.debug("Auto-advancing to next question")
-                withAnimation {
-                    currentQuestionIndex += 1
-                    lastAnswerCorrect = nil
-                    isWaitingForNextQuestion = false
-                }
-                return // Success! Exit the loop
+            withAnimation {
+                currentQuestionIndex += 1
             }
-            
-            // No next question available yet - show waiting indicator and try again
-            Logger.quiz.debug("No next question available - waiting and retrying")
-            isWaitingForNextQuestion = true
-            
-            // Wait a bit before trying again
-            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        }
+        
+        // After skipping, check if we need to wait for more questions or end the quiz
+        if !canNavigateToNext {
+            // Check if we've reached the question limit
+            if !currentQuizSettings.isUnlimitedQuestions && 
+               currentSessionAnsweredQuestions.count >= currentQuizSettings.maxQuestions {
+                Logger.quiz.debug("Reached maximum questions after skipping - ending quiz")
+                endQuiz()
+            } else {
+                // Need more questions - set waiting state
+                Logger.quiz.debug("Reached end of available questions after skipping - waiting for generation")
+                isWaitingForNextQuestion = true
+                if !isBackgroundGenerating {
+                    startBackgroundGeneration()
+                }
+            }
         }
     }
     
