@@ -15,6 +15,15 @@ typealias AnsweredQuestion = AnsweredQuestionV1
 enum Question: String, Codable, CaseIterable {
     case multipleChoice
     case trueFalse
+    
+    var displayName: String {
+        switch self {
+        case .multipleChoice:
+            return "Multiple Choice"
+        case .trueFalse:
+            return "True/False"
+        }
+    }
 }
 
 // Schema versions for migration

@@ -1,0 +1,399 @@
+//
+//  AnalyticsView.swift
+//  AutoQuiz
+//
+//  Created by Rafael Francisco on 18/06/2025.
+//
+
+import SwiftUI
+import SwiftData
+
+struct AnalyticsView: View {
+    @Environment(\.modelContext) private var modelContext
+    @State private var selectedTimeRange: TimeRange = .thisWeek
+    @State private var analyticsService: AnalyticsService?
+    @State private var timeRangeMetrics: TimeRangeMetrics?
+    @State private var isLoading = true
+    
+    let document: Item?
+    
+    init(document: Item? = nil) {
+        self.document = document
+    }
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 20) {
+                    if isLoading {
+                        ProgressView("Loading analytics...")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if let metrics = timeRangeMetrics {
+                        // Time Range Selector
+                        timeRangeSelector
+                        
+                        // Overview Cards
+                        overviewSection(metrics.overview)
+                        
+                        // Accuracy Trend Chart
+                        if !metrics.accuracyTrend.isEmpty {
+                            accuracyTrendSection(metrics.accuracyTrend)
+                        }
+                        
+                        // Question Type Breakdown
+                        if !metrics.sessionTypeBreakdown.isEmpty {
+                            questionTypeSection(metrics.sessionTypeBreakdown)
+                        }
+                        
+                        // Learning Progress
+                        learningProgressSection
+                        
+                        // Recent Sessions
+                        if !metrics.sessions.isEmpty {
+                            recentSessionsSection(metrics.sessions.suffix(5))
+                        }
+                    } else {
+                        emptyStateView
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle(document?.title ?? "Performance Analytics")
+            .onAppear {
+                setupAnalyticsService()
+                loadAnalytics()
+            }
+            .onChange(of: selectedTimeRange) { _, _ in
+                loadAnalytics()
+            }
+        }
+    }
+    
+    // MARK: - Time Range Selector
+    
+    private var timeRangeSelector: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Time Period")
+                .font(.headline)
+                .fontWeight(.semibold)
+            
+            Picker("Time Range", selection: $selectedTimeRange) {
+                ForEach(TimeRange.allCases, id: \.self) { range in
+                    Text(range.displayName).tag(range)
+                }
+            }
+            .pickerStyle(.segmented)
+        }
+    }
+    
+    // MARK: - Overview Section
+    
+    private func overviewSection(_ overview: PerformanceOverview) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Overview")
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            LazyVGrid(columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible())
+            ], spacing: 12) {
+                MetricCard(
+                    title: "Total Sessions",
+                    value: "\(overview.totalSessions)",
+                    subtitle: "\(overview.completedSessions) completed",
+                    color: .blue
+                )
+                
+                MetricCard(
+                    title: "Overall Accuracy",
+                    value: "\(Int(overview.overallAccuracy))%",
+                    subtitle: "\(overview.totalCorrectAnswers)/\(overview.totalQuestionsAnswered) correct",
+                    color: .green
+                )
+                
+                MetricCard(
+                    title: "Total Points",
+                    value: "\(overview.totalPointsEarned)",
+                    subtitle: "Points earned",
+                    color: .orange
+                )
+                
+                MetricCard(
+                    title: "Avg. Session",
+                    value: formatDuration(overview.averageSessionDuration),
+                    subtitle: "Average duration",
+                    color: .purple
+                )
+            }
+        }
+    }
+    
+    // MARK: - Accuracy Trend Section
+    
+    private func accuracyTrendSection(_ trend: [AccuracyTrend]) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Accuracy Trend")
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            AccuracyTrendChart(data: trend)
+                .frame(height: 200)
+                .background(Color.platformControlBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+    
+    // MARK: - Question Type Section
+    
+    private func questionTypeSection(_ metrics: [SessionTypeMetrics]) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Performance by Question Type")
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            ForEach(metrics, id: \.questionType) { metric in
+                QuestionTypeCard(metric: metric)
+            }
+        }
+    }
+    
+    // MARK: - Learning Progress Section
+    
+    private var learningProgressSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Learning Progress")
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            if let _ = timeRangeMetrics, let analyticsService = analyticsService {
+                let progress = analyticsService.getLearningProgress(for: selectedTimeRange, document: document)
+                
+                LazyVGrid(columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible())
+                ], spacing: 12) {
+                    MetricCard(
+                        title: "Current Streak",
+                        value: "\(progress.currentStreak)",
+                        subtitle: "Perfect sessions",
+                        color: .red
+                    )
+                    
+                    MetricCard(
+                        title: "Best Streak",
+                        value: "\(progress.bestStreak)",
+                        subtitle: "Personal best",
+                        color: .indigo
+                    )
+                }
+                
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Trend")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(progress.recentPerformanceTrend.displayName)
+                            .font(.headline)
+                            .foregroundColor(colorForTrend(progress.recentPerformanceTrend))
+                    }
+                    
+                    Spacer()
+                    
+                    if progress.improvementRate != 0 {
+                        VStack(alignment: .trailing, spacing: 4) {
+                            Text("Improvement")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("\(progress.improvementRate > 0 ? "+" : "")\(String(format: "%.1f", progress.improvementRate))%")
+                                .font(.headline)
+                                .foregroundColor(progress.improvementRate > 0 ? .green : .red)
+                        }
+                    }
+                }
+                .padding()
+                .background(Color.platformControlBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+        }
+    }
+    
+    // MARK: - Recent Sessions Section
+    
+    private func recentSessionsSection<T: Collection>(_ sessions: T) -> some View where T.Element == QuizSession {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Recent Sessions")
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            ForEach(Array(sessions), id: \.id) { session in
+                SessionCard(session: session)
+            }
+        }
+    }
+    
+    // MARK: - Empty State
+    
+    private var emptyStateView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "chart.bar.xaxis")
+                .font(.system(size: 60))
+                .foregroundColor(.secondary)
+            
+            Text("No Analytics Data")
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            Text("Complete some quizzes to see your performance analytics here.")
+                .font(.body)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(40)
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func setupAnalyticsService() {
+        analyticsService = AnalyticsService(modelContext: modelContext)
+    }
+    
+    private func loadAnalytics() {
+        guard let analyticsService = analyticsService else { return }
+        
+        isLoading = true
+        
+        Task {
+            let metrics = analyticsService.getTimeRangeMetrics(for: selectedTimeRange, document: document)
+            
+            await MainActor.run {
+                self.timeRangeMetrics = metrics
+                self.isLoading = false
+            }
+        }
+    }
+    
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let minutes = Int(duration) / 60
+        let seconds = Int(duration) % 60
+        return "\(minutes)m \(seconds)s"
+    }
+    
+    private func colorForTrend(_ trend: PerformanceTrendDirection) -> Color {
+        switch trend {
+        case .improving: return .green
+        case .declining: return .red
+        case .stable: return .blue
+        }
+    }
+}
+
+// MARK: - Supporting Views
+
+struct MetricCard: View {
+    let title: String
+    let value: String
+    let subtitle: String
+    let color: Color
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(title)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Circle()
+                    .fill(color)
+                    .frame(width: 8, height: 8)
+            }
+            
+            Text(value)
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(.primary)
+            
+            Text(subtitle)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .background(Color.platformControlBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+struct QuestionTypeCard: View {
+    let metric: SessionTypeMetrics
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(metric.questionType.displayName)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                
+                Text("\(metric.sessionCount) sessions • \(metric.totalQuestions) questions")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("\(Int(metric.averageAccuracy))%")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                
+                Text("accuracy")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .background(Color.platformControlBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+struct SessionCard: View {
+    let session: QuizSession
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(session.questionType.displayName)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                
+                Text(session.startTime, style: .date)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("\(Int(session.accuracyPercentage))%")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(session.accuracyPercentage >= 80 ? .green : session.accuracyPercentage >= 60 ? .orange : .red)
+                
+                Text("\(session.questionsCorrect)/\(session.questionsAttempted)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Image(systemName: session.isCompleted ? "checkmark.circle.fill" : "xmark.circle.fill")
+                .foregroundColor(session.isCompleted ? .green : .red)
+        }
+        .padding()
+        .background(Color.platformControlBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+#Preview {
+    AnalyticsView()
+}
