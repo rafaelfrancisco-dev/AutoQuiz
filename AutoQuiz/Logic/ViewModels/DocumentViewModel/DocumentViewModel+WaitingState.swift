@@ -30,6 +30,25 @@ extension DocumentViewModel {
             return 
         }
         
+        // For session-based quizzes, check if new questions were added to currentSessionQuestions
+        if hasStartedQuiz {
+            let currentSessionCount = currentSessionQuestions.count
+            let hasNewSessionQuestions = currentQuestionIndex < currentSessionCount - 1
+            
+            Logger.viewModel.debug("Session mode - currentIndex: \(self.currentQuestionIndex), sessionCount: \(currentSessionCount), hasNew: \(hasNewSessionQuestions)")
+            
+            if hasNewSessionQuestions {
+                Logger.viewModel.debug("Auto-advancing to new session question")
+                withAnimation {
+                    currentQuestionIndex += 1
+                    isWaitingForNextQuestion = false
+                    lastAnswerCorrect = nil
+                }
+                return
+            }
+        }
+        
+        // Fallback to original logic for non-session quizzes
         let currentCounts = currentQuestionCounts
         let hasNewQuestions: Bool
         

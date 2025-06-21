@@ -9,6 +9,22 @@ import SwiftUI
 import SwiftData
 import OSLog
 
+struct GenerationLoadingIndicator: View {
+    let message: String
+    let scale: CGFloat
+    
+    var body: some View {
+        HStack {
+            ProgressView()
+                .scaleEffect(scale)
+            
+            Text(message)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+}
+
 struct DocumentView: View {
     @Environment(\.modelContext) private var modelContext
     
@@ -16,6 +32,7 @@ struct DocumentView: View {
     @State private var showingHistoricalQuestions = false
     @State private var showingQuizOptions = false
     @State private var showingAddContent = false
+    @State private var showingAnalytics = false
     
     init(item: Item) {
         self.viewModel = DocumentViewModel(item: item)
@@ -103,6 +120,9 @@ struct DocumentView: View {
         .sheet(isPresented: $showingAddContent) {
             AddContentView(item: viewModel.item)
         }
+        .sheet(isPresented: $showingAnalytics) {
+            AnalyticsView(document: viewModel.item)
+        }
         .onAppear {
             viewModel.modelContext = modelContext
         }
@@ -129,31 +149,34 @@ struct DocumentView: View {
     @ViewBuilder
     private var startView: some View {
         VStack(spacing: 30) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Choose Question Type")
-                    .font(.title2)
-                    .fontWeight(.semibold)
+            VStack(alignment: .leading, spacing: 20) {
+                contentDetailsView
                 
-                Picker("Question Type", selection: $viewModel.selectedQuestionType) {
-                    ForEach(Question.allCases, id: \.self) { type in
-                        Text(type.rawValue.capitalized).tag(type)
+                VStack(spacing: 12) {
+                    Button {
+                        withAnimation {
+                            showingQuizOptions = true
+                        }
+                    } label: {
+                        Text("Start Quiz")
+                            .frame(maxWidth: .infinity)
                     }
-                }
-                .pickerStyle(.segmented)
-                
-                Spacer()
-                
-                Button {
-                    withAnimation {
-                        showingQuizOptions = true
-                    }
-                } label: {
-                    Text("Start Quiz")
+                    .buttonStyle(.borderedProminent)
+                    .disabled(viewModel.isGenerating)
+                    .controlSize(.large)
+                    
+                    Button {
+                        showingAnalytics = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "chart.bar")
+                            Text("View Analytics")
+                        }
                         .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(viewModel.isGenerating)
-                .controlSize(.large)
             }
             .padding()
             
@@ -169,6 +192,8 @@ struct DocumentView: View {
     private var quizView: some View {
         ScrollView {
             VStack {
+                questionProgressIndicator
+                
                 HStack {
                     pointsDisplay
                     
@@ -235,14 +260,10 @@ struct DocumentView: View {
                     .frame(height: 20)
                 
                 if viewModel.shouldShowWaitingIndicator {
-                    HStack {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                        
-                        Text("Generating next question...")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    GenerationLoadingIndicator(
+                        message: "Generating next question...",
+                        scale: 0.8
+                    )
                     .padding()
                 }
                 
@@ -267,30 +288,105 @@ struct DocumentView: View {
                 .foregroundColor(.primary)
             
             if viewModel.isBackgroundGenerating {
-                HStack(spacing: 4) {
-                    ProgressView()
-                        .scaleEffect(0.6)
-                    Text("Generating questions...")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+                GenerationLoadingIndicator(
+                    message: "Generating questions...",
+                    scale: 0.6
+                )
             }
         }
     }
     
-    private var questionTypeToggle: some View {
-        Picker("Question Type", selection: $viewModel.selectedQuestionType) {
-            ForEach(Question.allCases, id: \.self) { type in
-                Text(type.rawValue.capitalized).tag(type)
+    
+    private var contentDetailsView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Document Details")
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "doc.text")
+                        .foregroundColor(.secondary)
+                        .frame(width: 20)
+                    Text("Word Count:")
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(wordCount)")
+                        .fontWeight(.medium)
+                }
+                
+                HStack {
+                    Image(systemName: "textformat.abc")
+                        .foregroundColor(.secondary)
+                        .frame(width: 20)
+                    Text("Character Count:")
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(viewModel.item.content.count)")
+                        .fontWeight(.medium)
+                }
+                
+                HStack {
+                    Image(systemName: "questionmark.circle")
+                        .foregroundColor(.secondary)
+                        .frame(width: 20)
+                    Text("Available Questions:")
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(totalQuestionCount)")
+                        .fontWeight(.medium)
+                }
             }
+            .font(.caption)
         }
-        .pickerStyle(.segmented)
         .padding()
-        .onChange(of: viewModel.selectedQuestionType) { _, newType in
-            withAnimation {
-                viewModel.switchQuestionType(to: newType)
+        .background(Color.secondary.opacity(0.1))
+        .cornerRadius(8)
+    }
+    
+    private var wordCount: Int {
+        viewModel.item.content
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .count
+    }
+    
+    private var totalQuestionCount: Int {
+        viewModel.item.questions.count + (viewModel.item.trueFalseQuestions?.count ?? 0)
+    }
+    
+    private var questionProgressIndicator: some View {
+        VStack(spacing: 4) {
+            HStack {
+                Text("Question \(viewModel.currentQuestionIndex + 1)")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .contentTransition(.numericText())
+                
+                if !viewModel.currentQuizSettings.isUnlimitedQuestions {
+                    Text("of \(viewModel.currentQuizSettings.maxQuestions)")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                } else if viewModel.hasStartedQuiz {
+                    Text("of \(viewModel.currentSessionQuestions.count)")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                        .contentTransition(.numericText())
+                }
+            }
+            .animation(.spring(response: 0.6, dampingFraction: 0.8), value: viewModel.currentQuestionIndex)
+            .animation(.spring(response: 0.6, dampingFraction: 0.8), value: viewModel.currentSessionQuestions.count)
+            
+            if !viewModel.currentQuizSettings.isUnlimitedQuestions {
+                ProgressView(value: Double(viewModel.currentQuestionIndex + 1), total: Double(viewModel.currentQuizSettings.maxQuestions))
+                    .progressViewStyle(LinearProgressViewStyle())
+                    .frame(height: 6)
+                    .scaleEffect(x: 1, y: 1.5)
+                    .animation(.easeInOut(duration: 0.4), value: viewModel.currentQuestionIndex)
             }
         }
+        .padding(.horizontal)
+        .padding(.bottom, 8)
     }
     
     private var navigationControls: some View {
@@ -313,6 +409,7 @@ struct DocumentView: View {
                     }
                 }
                 .buttonStyle(.bordered)
+                .controlSize(.large)
             }
         }
         .padding()

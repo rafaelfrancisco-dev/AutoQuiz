@@ -3,7 +3,8 @@
     "allow": [
       "Bash(xcodebuild:*)",
       "WebFetch(domain:www.hackingwithswift.com)",
-      "WebFetch(domain:developer.apple.com)"
+      "WebFetch(domain:developer.apple.com)",
+      "Bash(rg:*)"
     ],
     "deny": []
   }

@@ -83,9 +83,6 @@ extension DocumentViewModel {
         }
         
         isBackgroundGenerating = false
-        
-        // Final check to clear waiting state if needed
-        clearWaitingStateIfNeeded()
     }
     
     @MainActor
@@ -100,8 +97,8 @@ extension DocumentViewModel {
             
             Logger.generation.info("Generated multiple choice questions")
             
-            // Check if user is waiting for next question and auto-advance
-            checkForNewQuestionsAndAutoAdvance()
+            // Add new questions to current session if active
+            addNewQuestionsToSessionIfActive(questions.count, type: .multipleChoice)
             
             try? modelContext?.save()
         } catch {
@@ -125,13 +122,55 @@ extension DocumentViewModel {
             
             Logger.generation.info("Generated true/false questions")
             
-            // Check if user is waiting for next question and auto-advance
-            checkForNewQuestionsAndAutoAdvance()
+            // Add new questions to current session if active
+            addNewQuestionsToSessionIfActive(questions.count, type: .trueFalse)
             
             try? modelContext?.save()
         } catch {
             Logger.error.error("Background generation error (true/false): \(error)")
             try? await Task.sleep(nanoseconds: 2_000_000_000)
         }
+    }
+    
+    @MainActor
+    private func addNewQuestionsToSessionIfActive(_ newQuestionCount: Int, type: Question) {
+        // Only update session if quiz is active and types match
+        guard hasStartedQuiz && currentQuizSettings.questionType == type else { return }
+        
+        let newQuestions: [QuizQuestion]
+        
+        switch type {
+        case .multipleChoice:
+            let totalQuestions = item.questions.count
+            let startIndex = totalQuestions - newQuestionCount
+            
+            newQuestions = Array(item.questions[startIndex...]).enumerated().map { offset, question in
+                QuizQuestion.multipleChoice(question, originalIndex: startIndex + offset)
+            }
+            
+        case .trueFalse:
+            guard let trueFalseQuestions = item.trueFalseQuestions else { return }
+            let totalQuestions = trueFalseQuestions.count
+            let startIndex = totalQuestions - newQuestionCount
+            
+            newQuestions = Array(trueFalseQuestions[startIndex...]).enumerated().map { offset, question in
+                QuizQuestion.trueFalse(question, originalIndex: startIndex + offset)
+            }
+        }
+        
+        // Check if adding new questions would exceed session limits
+        if !currentQuizSettings.isUnlimitedQuestions {
+            let remainingSlots = currentQuizSettings.maxQuestions - currentSessionQuestions.count
+            if remainingSlots <= 0 { return }
+            
+            // Only add questions up to the limit
+            let questionsToAdd = Array(newQuestions.prefix(remainingSlots))
+            currentSessionQuestions.append(contentsOf: questionsToAdd)
+        } else {
+            // Unlimited quiz - add all new questions
+            currentSessionQuestions.append(contentsOf: newQuestions)
+        }
+        
+        Logger.generation.debug("Added \(newQuestions.count) new questions to active session")
     }
 }

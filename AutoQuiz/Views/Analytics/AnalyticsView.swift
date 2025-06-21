@@ -10,6 +10,7 @@ import SwiftData
 
 struct AnalyticsView: View {
     @Environment(\.modelContext) private var modelContext
+    
     @State private var selectedTimeRange: TimeRange = .thisWeek
     @State private var analyticsService: AnalyticsService?
     @State private var timeRangeMetrics: TimeRangeMetrics?
