@@ -156,6 +156,11 @@ extension DocumentViewModel {
             newQuestions = Array(trueFalseQuestions[startIndex...]).enumerated().map { offset, question in
                 QuizQuestion.trueFalse(question, originalIndex: startIndex + offset)
             }
+            
+        case .spacedRepetition:
+            // Spaced repetition doesn't use background generation
+            // It has its own dedicated view and service
+            return
         }
         
         // Check if adding new questions would exceed session limits

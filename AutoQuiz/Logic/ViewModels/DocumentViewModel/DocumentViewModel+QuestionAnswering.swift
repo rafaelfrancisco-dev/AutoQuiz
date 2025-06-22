@@ -10,6 +10,26 @@ import SwiftUI
 import OSLog
 
 extension DocumentViewModel {
+    func answeredSpacedRepetitionCard(card: SpacedRepetitionCard, quality: Int, responseTime: TimeInterval) {
+        // Handle spaced repetition card reviews differently - no points system, just tracking
+        let answeredQuestion = AnsweredQuestionV1(
+            questionText: card.questionText,
+            userAnswer: "Quality: \(quality)", // Store quality rating as user answer
+            correctAnswer: card.answerText,
+            isCorrect: quality >= 3, // Quality 3+ considered correct
+            pointsEarned: 0, // No points for spaced repetition
+            questionType: .spacedRepetition
+        )
+        
+        recordAnswer(answeredQuestion)
+        
+        // Auto-advance after brief delay for UI feedback
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            await handleAutoAdvanceAfterAnswer()
+        }
+    }
+    
     func answeredQuestion(question: MultipleChoiceQuestion, correct: Bool, userAnswer: String) {
         let pointsEarned = correct ? 10 : 0
         

@@ -10,6 +10,7 @@ import Foundation
 enum QuizQuestion {
     case multipleChoice(MultipleChoiceQuestion, originalIndex: Int)
     case trueFalse(TrueFalseQuestion, originalIndex: Int)
+    case spacedRepetition(SpacedRepetitionCard)
     
     var questionText: String {
         switch self {
@@ -17,6 +18,8 @@ enum QuizQuestion {
             return question.question
         case .trueFalse(let question, _):
             return question.question
+        case .spacedRepetition(let card):
+            return card.questionText
         }
     }
     
@@ -26,6 +29,8 @@ enum QuizQuestion {
             return index
         case .trueFalse(_, let index):
             return index
+        case .spacedRepetition(_):
+            return 0 // Spaced repetition doesn't use original index
         }
     }
 }

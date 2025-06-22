@@ -33,6 +33,7 @@ struct DocumentView: View {
     @State private var showingQuizOptions = false
     @State private var showingAddContent = false
     @State private var showingAnalytics = false
+    @State private var showingSpacedRepetition = false
     
     init(item: Item) {
         self.viewModel = DocumentViewModel(item: item)
@@ -123,6 +124,9 @@ struct DocumentView: View {
         .sheet(isPresented: $showingAnalytics) {
             AnalyticsView(document: viewModel.item)
         }
+        .sheet(isPresented: $showingSpacedRepetition) {
+            SpacedRepetitionView(document: viewModel.item)
+        }
         .onAppear {
             viewModel.modelContext = modelContext
         }
@@ -171,6 +175,18 @@ struct DocumentView: View {
                         HStack {
                             Image(systemName: "chart.bar")
                             Text("View Analytics")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    
+                    Button {
+                        showingSpacedRepetition = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "brain.head.profile")
+                            Text("Spaced Repetition")
                         }
                         .frame(maxWidth: .infinity)
                     }
@@ -228,6 +244,13 @@ struct DocumentView: View {
                         }
                         .padding()
                         .id("truefalse-\(viewModel.currentQuestionIndex)")
+                        
+                    case .spacedRepetition(_):
+                        // Spaced repetition should not appear in regular quiz sessions
+                        // It has its own dedicated view and workflow
+                        Text("Spaced repetition cards should not appear in regular quizzes")
+                            .foregroundColor(.red)
+                            .padding()
                     }
                 } else {
                     // Fallback to original logic for non-session quiz
@@ -278,6 +301,9 @@ struct DocumentView: View {
             return !viewModel.item.questions.isEmpty
         case .trueFalse:
             return !(viewModel.item.trueFalseQuestions ?? []).isEmpty
+        case .spacedRepetition:
+            // Spaced repetition always has questions available since it uses its own system
+            return true
         }
     }
     

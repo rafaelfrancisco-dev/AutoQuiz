@@ -15,6 +15,7 @@ typealias AnsweredQuestion = AnsweredQuestionV1
 enum Question: String, Codable, CaseIterable {
     case multipleChoice
     case trueFalse
+    case spacedRepetition
     
     var displayName: String {
         switch self {
@@ -22,6 +23,8 @@ enum Question: String, Codable, CaseIterable {
             return "Multiple Choice"
         case .trueFalse:
             return "True/False"
+        case .spacedRepetition:
+            return "Spaced Repetition"
         }
     }
 }
@@ -39,7 +42,7 @@ enum SchemaV2: VersionedSchema {
     static var versionIdentifier = Schema.Version(2, 0, 0)
     
     static var models: [any PersistentModel.Type] {
-        [ItemV2.self, AnsweredQuestionV1.self, QuizSession.self]
+        [ItemV2.self, AnsweredQuestionV1.self, QuizSession.self, SpacedRepetitionCard.self]
     }
 }
 

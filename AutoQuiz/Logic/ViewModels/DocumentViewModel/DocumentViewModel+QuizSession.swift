@@ -63,6 +63,10 @@ extension DocumentViewModel {
             availableQuestions = (item.trueFalseQuestions ?? []).enumerated().map { index, question in
                 QuizQuestion.trueFalse(question, originalIndex: index)
             }
+        case .spacedRepetition:
+            // Spaced repetition uses its own separate view and workflow
+            // No questions are prepared here as it's handled by SpacedRepetitionView
+            availableQuestions = []
         }
         
         // Include previously failed questions if enabled
@@ -100,6 +104,10 @@ extension DocumentViewModel {
                     let originalIndex = item.trueFalseQuestions?.firstIndex(where: { $0.question == failedAnswer.questionText }) ?? 0
                     failedQuestions.append(.trueFalse(question, originalIndex: originalIndex))
                 }
+            case .spacedRepetition:
+                // Spaced repetition cards have their own review system and scheduling
+                // They don't need to be included in regular quiz failed questions
+                break
             }
         }
         

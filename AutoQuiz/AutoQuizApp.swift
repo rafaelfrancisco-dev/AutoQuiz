@@ -14,7 +14,7 @@ struct AutoQuizApp: App {
         do {
             // For now, create a fresh container without migration to avoid conflicts
             let configuration = ModelConfiguration(isStoredInMemoryOnly: false)
-            return try ModelContainer(for: Item.self, AnsweredQuestion.self, QuizSession.self, configurations: configuration)
+            return try ModelContainer(for: Item.self, AnsweredQuestion.self, QuizSession.self, SpacedRepetitionCard.self, configurations: configuration)
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }

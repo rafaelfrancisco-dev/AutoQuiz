@@ -19,15 +19,17 @@ AutoQuiz is a SwiftUI-based app that generates quiz questions from documents usi
 
 ### Core Architecture
 - **SwiftData** for data persistence with `Item` model storing document content and generated questions
-- **FoundationModels** integration for AI-powered question generation using `@Generable` protocol
+- **FoundationModels** integration for AI-powered question generation using `@Generable` protocol (100% offline AI processing)
 - **MVVM pattern** with `DocumentViewModel` coordinating between models and views
 - **Cross-platform** support with conditional compilation for iOS/macOS differences
 
 ### Key Components
 - `Item` (SwiftData model): Stores document content, timestamp, title, and generated questions
 - `Question` (Codable struct): Represents multiple choice questions with `@Generable` annotation
+- `SpacedRepetitionCard` (SwiftData model): Stores spaced repetition cards with SM-2 algorithm data
 - `Generator`: Handles AI generation of questions and titles from document content
 - `DocumentViewModel`: Observable view model managing quiz state and generation
+- `SpacedRepetitionService`: Manages spaced repetition card lifecycle and review sessions
 - `GenerativeView`: Wrapper providing LanguageModelSession to child views
 
 ### Data Flow
@@ -46,7 +48,7 @@ AutoQuiz is a SwiftUI-based app that generates quiz questions from documents usi
 
 ### Current Schema Versions
 - **SchemaV1** (Version 1.0.0): Original schema with `ItemV1` including `totalPoints` field
-- **SchemaV2** (Version 2.0.0): Current schema with `ItemV2` (removed `totalPoints`) and `AnsweredQuestionV1`
+- **SchemaV2** (Version 2.0.0): Current schema with `ItemV2` (removed `totalPoints`), `AnsweredQuestionV1`, and `SpacedRepetitionCard`
 
 ### Migration Setup
 - Migration plan: `ItemMigrationPlan` handles V1→V2 lightweight migration
@@ -72,8 +74,25 @@ AutoQuiz is a SwiftUI-based app that generates quiz questions from documents usi
 ### Quiz Settings
 - **Default**: 10 questions, multiple choice, shuffle enabled
 - **Unlimited mode**: Set via `QuizSettings.setUnlimitedQuestions()` (maxQuestions = Int.max)
-- **Types**: Multiple choice and true/false questions
+- **Types**: Multiple choice, true/false, and spaced repetition
 - **Session management**: Questions stored in `currentSessionQuestions` array
+
+### Spaced Repetition System
+- **Algorithm**: SM-2 spaced repetition algorithm with quality-based adjustments (1-5 scale)
+- **Model**: `SpacedRepetitionCard` in `Models/SpacedRepetition/SpacedRepetitionCard.swift`
+- **Service**: `SpacedRepetitionService` for card management and review sessions
+- **Analytics**: `SpacedRepetitionAnalyticsService` for performance tracking
+- **UI**: `SpacedRepetitionView` with flashcard-style interface
+- **Features**:
+  - Auto-generated cards from existing questions
+  - Quality rating buttons (Perfect, Good, Hard, Wrong)
+  - Learning phase graduation after 2 consecutive correct answers
+  - Dynamic difficulty adjustment based on easiness factor
+  - Due date scheduling with intervals from 1 day to months
+  - Progress tracking with streaks and retention rates
+  - Session completion statistics
+- **Integration**: Accessible via "Spaced Repetition" button on document view
+- **Question Types**: Supports both multiple choice and true/false converted to flashcards
 
 ## iOS 26 / SwiftUI Features
 
@@ -120,3 +139,12 @@ References:
 - Use `fatalError` for unrecoverable SwiftData container creation failures
 - Log migration steps using `Logger.database` for debugging
 - Handle build errors by checking model compatibility and imports
+
+### Question Type Enum
+- Located in `Models/Schemas.swift`
+- Cases: `.multipleChoice`, `.trueFalse`, `.spacedRepetition`
+- **Important**: When adding new question types, ensure all switch statements are updated:
+  - `DocumentViewModel+QuizSession.swift`: `prepareQuizSession()` and `getFailedQuestionsFromHistory()`
+  - `DocumentViewModel+BackgroundGeneration.swift`: `addNewQuestionsToSessionIfActive()`
+  - `DocumentView.swift`: `hasQuestionsForType()` and quiz session question handling
+  - `AnalyticsService.swift`: Filter spaced repetition from regular analytics

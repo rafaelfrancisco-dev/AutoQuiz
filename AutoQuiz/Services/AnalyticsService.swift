@@ -78,7 +78,7 @@ final class AnalyticsService {
         
         let groupedByType = Dictionary(grouping: sessions) { $0.questionType }
         
-        return Question.allCases.compactMap { questionType in
+        return Question.allCases.filter { $0 != .spacedRepetition }.compactMap { questionType in
             let typeSessions = groupedByType[questionType] ?? []
             guard !typeSessions.isEmpty else { return nil }
             
