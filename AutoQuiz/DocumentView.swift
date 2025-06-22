@@ -282,18 +282,9 @@ struct DocumentView: View {
     }
     
     private var pointsDisplay: some View {
-        HStack {
-            Text("Points: \(viewModel.currentPoints)")
-                .font(.headline)
-                .foregroundColor(.primary)
-            
-            if viewModel.isBackgroundGenerating {
-                GenerationLoadingIndicator(
-                    message: "Generating questions...",
-                    scale: 0.6
-                )
-            }
-        }
+        Text("Points: \(viewModel.currentPoints)")
+            .font(.headline)
+            .foregroundColor(.primary)
     }
     
     

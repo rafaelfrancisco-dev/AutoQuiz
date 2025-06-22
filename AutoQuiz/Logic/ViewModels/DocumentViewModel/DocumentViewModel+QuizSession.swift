@@ -14,17 +14,37 @@ extension DocumentViewModel {
         currentQuizSettings = settings
         selectedQuestionType = settings.questionType
         
-        // Prepare quiz session with settings
-        prepareQuizSession()
-        
-        hasStartedQuiz = true
+        // COMPLETELY RESET all session state
+        hasStartedQuiz = false
         currentQuestionIndex = 0
         currentSessionAnswers.removeAll()
         currentSessionAnsweredQuestions.removeAll()
+        currentSessionQuestions.removeAll()
         lastAnswerCorrect = nil
         isWaitingForNextQuestion = false
-        lastKnownQuestionCount = currentQuestionCounts
         showingResults = false
+        
+        // Create new QuizSession for analytics tracking
+        currentQuizSession = QuizSession(
+            document: item,
+            questionType: settings.questionType,
+            maxQuestions: settings.maxQuestions,
+            isUnlimitedQuestions: settings.isUnlimitedQuestions,
+            shuffleQuestions: settings.shuffleQuestions,
+            includeFailedQuestions: settings.includeFailedQuestions
+        )
+        
+        // Add to model context
+        if let session = currentQuizSession, let context = modelContext {
+            context.insert(session)
+        }
+        
+        // Prepare quiz session with settings
+        prepareQuizSession()
+        
+        // Now mark quiz as started
+        hasStartedQuiz = true
+        lastKnownQuestionCount = currentQuestionCounts
     }
     
     private func prepareQuizSession() {
@@ -87,6 +107,11 @@ extension DocumentViewModel {
     }
     
     func endQuiz() {
+        // Complete the current quiz session
+        if let session = currentQuizSession {
+            session.completeSession()
+        }
+        
         // Save all current session answers to the item's permanent storage
         // Points are no longer persisted - they reset after each quiz
         for answeredQuestion in currentSessionAnsweredQuestions {
@@ -106,6 +131,18 @@ extension DocumentViewModel {
     }
     
     func resetQuiz() {
+        // Handle current quiz session if it exists
+        if let session = currentQuizSession {
+            if !session.isCompleted {
+                session.abandonSession()
+                // Save the abandoned session to database
+                if let context = modelContext {
+                    try? context.save()
+                }
+            }
+        }
+        currentQuizSession = nil
+        
         hasStartedQuiz = false
         showingResults = false
         currentQuestionIndex = 0

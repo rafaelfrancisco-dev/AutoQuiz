@@ -39,7 +39,7 @@ enum SchemaV2: VersionedSchema {
     static var versionIdentifier = Schema.Version(2, 0, 0)
     
     static var models: [any PersistentModel.Type] {
-        [ItemV2.self, AnsweredQuestionV1.self]
+        [ItemV2.self, AnsweredQuestionV1.self, QuizSession.self]
     }
 }
 
@@ -57,9 +57,9 @@ enum ItemMigrationPlan: SchemaMigrationPlan {
         fromVersion: SchemaV1.self,
         toVersion: SchemaV2.self,
         willMigrate: { context in
-            // Migration from V1 to V2: Remove totalPoints field
-            // SwiftData will automatically handle field removal
-            Logger.database.info("Starting migration from V1 to V2 - removing totalPoints field")
+            // Migration from V1 to V2: Remove totalPoints field, add QuizSession
+            // SwiftData will automatically handle field removal and new model addition
+            Logger.database.info("Starting migration from V1 to V2 - removing totalPoints field and adding QuizSession")
         },
         didMigrate: { context in
             Logger.database.info("Completed migration from V1 to V2")
