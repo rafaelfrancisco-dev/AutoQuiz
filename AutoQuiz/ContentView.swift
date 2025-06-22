@@ -108,23 +108,11 @@ struct ContentView: View {
 
     private func handlePickedFile(url: URL) {
         do {
-            let fileType = UTType(filenameExtension: url.pathExtension)
-            if fileType == UTType.pdf {
-#if canImport(PDFKit)
-                if let pdfDoc = PDFDocument(url: url), let text = pdfDoc.string, !text.isEmpty {
-                    let newItem = Item(timestamp: Date(), content: text)
-                    modelContext.insert(newItem)
-                } else {
-                    errorMessage = "Could not extract text from PDF."
-                }
-#else
-                errorMessage = "PDFKit not available to extract PDF text."
-#endif
-            } else {
-                let content = try String(contentsOf: url, encoding: .utf8)
-                let newItem = Item(timestamp: Date(), content: content)
-                modelContext.insert(newItem)
-            }
+            let content = try FileHandler.extractContent(from: url)
+            let newItem = Item(timestamp: Date(), content: content)
+            modelContext.insert(newItem)
+        } catch let error as FileHandler.FileError {
+            errorMessage = error.localizedDescription
         } catch {
             errorMessage = "Could not read file: \(error.localizedDescription)"
         }
