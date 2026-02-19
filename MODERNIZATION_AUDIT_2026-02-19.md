@@ -9,10 +9,8 @@ Scope: iOS/macOS SwiftUI app using SwiftData + Foundation Models; project was st
 Primary modernization risks are:
 
 1. SwiftData migration plan exists but is not wired into `ModelContainer` startup.
-2. Foundation Models availability/error handling is too coarse and can lead to poor UX and retry loops.
-3. Quiz analytics metrics are not recorded into `QuizSession` during answer flow.
-4. Background generation cancellation/retry logic is fragile.
-5. Data model typo (`anwswer`) has become part of persisted contracts and should be migrated carefully.
+2. Quiz analytics metrics are not recorded into `QuizSession` during answer flow.
+3. Data model typo (`anwswer`) has become part of persisted contracts and should be migrated carefully.
 
 ## Prioritized Findings
 
@@ -30,24 +28,7 @@ Primary modernization risks are:
   - Create `ModelContainer` with explicit schema/migration plan:
   - `migrationPlan: ItemMigrationPlan.self`
 
-### 2) Foundation Models state handling too narrow
-- Evidence:
-  - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Logic/Generator.swift:38`
-  - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Logic/Generator.swift:55`
-- Detail:
-  - Generator only checks `.available` and otherwise throws generic `sessionUnavailable`.
-  - No mapping for readiness, locale support, or throttling/concurrency errors.
-- Impact:
-  - Unclear UX, repeated failures, and no actionable user messaging.
-- Recommendation:
-  - Introduce explicit generator state/errors for:
-  - model not ready
-  - locale unsupported
-  - rate limiting/concurrency
-  - context window overflow
-  - Use these states in UI gating and retries.
-
-### 3) QuizSession metrics are never updated during answers
+### 2) QuizSession metrics are never updated during answers
 - Evidence:
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Logic/ViewModels/DocumentViewModel/DocumentViewModel+QuestionAnswering.swift:75`
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Models/Analytics/QuizSession.swift:85`
@@ -58,23 +39,9 @@ Primary modernization risks are:
 - Recommendation:
   - On each answer, call `currentQuizSession?.recordQuestionResponse(...)` with correctness, points, response time.
 
-### 4) Background generation cancellation logic is brittle
-- Evidence:
-  - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Logic/ViewModels/DocumentViewModel/DocumentViewModel+BackgroundGeneration.swift:31`
-  - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/DocumentView.swift:71`
-- Detail:
-  - Loop checks `backgroundGenerationTask?.isCancelled` instead of `Task.isCancelled`.
-  - Generation starts automatically from `.task` regardless of model readiness.
-- Impact:
-  - Risk of stale tasks continuing and retry loops under unavailability.
-- Recommendation:
-  - Use `Task.isCancelled` in task body.
-  - Add bounded retry/backoff and terminal state.
-  - Gate start by availability/locale checks.
-
 ## P1 (High Value Next)
 
-### 5) `anwswer` field typo should be migrated safely
+### 3) `anwswer` field typo should be migrated safely
 - Evidence:
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Models/Questions/MultipleChoiceQuestion.swift:20`
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Services/SpacedRepetitionService.swift:31`
@@ -85,7 +52,7 @@ Primary modernization risks are:
 - Recommendation:
   - Plan schema bump with backward-compatible decode mapping, then migrate to `answer`.
 
-### 6) Platform/tooling docs and project settings are inconsistent
+### 4) Platform/tooling docs and project settings are inconsistent
 - Evidence:
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/README.md:26`
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz.xcodeproj/project.pbxproj:413`
@@ -94,7 +61,7 @@ Primary modernization risks are:
 - Recommendation:
   - Decide true baseline and supported platforms, then align README and build settings.
 
-### 7) Quiz language option is not wired into generation
+### 5) Quiz language option is not wired into generation
 - Evidence:
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Models/QuizSettings.swift:48`
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Views/QuizOptionsView.swift:188`
@@ -104,7 +71,7 @@ Primary modernization risks are:
 - Recommendation:
   - Thread quiz language setting into Generator and locale support checks.
 
-### 8) Content edits do not invalidate all derived artifacts
+### 6) Content edits do not invalidate all derived artifacts
 - Evidence:
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Views/AddContentView.swift:295`
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Views/SpacedRepetition/SpacedRepetitionView.swift:303`
@@ -113,7 +80,7 @@ Primary modernization risks are:
 - Recommendation:
   - Define explicit invalidation/versioning policy for sessions and spaced repetition cards on content mutation.
 
-### 9) Test coverage is placeholder-only
+### 7) Test coverage is placeholder-only
 - Evidence:
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuizTests/AutoQuizTests.swift:12`
 - Recommendation:
@@ -127,18 +94,17 @@ Primary modernization risks are:
 
 - `swiftlint lint --strict --no-cache` reports high style debt:
   - 762 violations across 42 files (mostly trailing whitespace/line length).
-- `xcodebuild -list -project AutoQuiz.xcodeproj` works, but full build/test in this sandbox is limited by CoreSimulator/DerivedData permissions.
+- `xcodebuild build -project AutoQuiz.xcodeproj -scheme AutoQuiz -destination 'platform=macOS' -derivedDataPath /tmp/AutoQuizDerivedData CODE_SIGNING_ALLOWED=NO` succeeded.
+- `xcodebuild test -project AutoQuiz.xcodeproj -scheme AutoQuiz -destination 'platform=macOS' -derivedDataPath /tmp/AutoQuizDerivedData CODE_SIGNING_ALLOWED=NO -only-testing:AutoQuizTests` succeeded.
 
 ## Recommended Implementation Order
 
 1. Wire migration plan in app startup (`AutoQuizApp` + schema sanity check).
-2. Refactor generator to expose structured availability/error outcomes.
-3. Update background generation task lifecycle (cancellation, retry backoff, start gating).
-4. Record `QuizSession` metrics per answer.
-5. Add tests for above behavior.
-6. Plan and execute `anwswer` -> `answer` migration.
-7. Align project settings/README and decide platform scope.
-8. Tackle lint cleanup with an automated formatting pass + lint baseline reduction.
+2. Record `QuizSession` metrics per answer.
+3. Add tests for above behavior.
+4. Plan and execute `anwswer` -> `answer` migration.
+5. Align project settings/README and decide platform scope.
+6. Tackle lint cleanup with an automated formatting pass + lint baseline reduction.
 
 ## Open Decisions For Next Session
 

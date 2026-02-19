@@ -11,8 +11,25 @@ import SwiftData
 import OSLog
 
 extension DocumentViewModel {
+    private enum GenerationAttemptResult {
+        case success
+        case retryableFailure(GeneratorError)
+        case terminalFailure(GeneratorError)
+    }
+    
+    private var maxConsecutiveGenerationFailures: Int { 5 }
+    
     func startBackgroundGeneration() {
         backgroundGenerationTask?.cancel()
+        
+        if let issue = generator.currentAvailabilityIssue() {
+            generationIssue = issue
+            isBackgroundGenerating = false
+            isWaitingForNextQuestion = false
+            return
+        }
+        
+        generationIssue = nil
         
         backgroundGenerationTask = Task { @MainActor in
             await generateBackgroundQuestions()
@@ -28,13 +45,15 @@ extension DocumentViewModel {
     
     @MainActor
     private func generateBackgroundQuestions() async {
-        guard backgroundGenerationTask?.isCancelled == false else { return }
+        guard !Task.isCancelled else { return }
         
         Logger.generation.debug("Starting background generation")
         isBackgroundGenerating = true
+        var consecutiveFailures = 0
+        var lastRetryableIssue: GeneratorError?
         
         // Initial generation to ensure we have questions for both types
-        while backgroundGenerationTask?.isCancelled == false {
+        while !Task.isCancelled {
             let multipleChoiceCount = item.questions.count
             let trueFalseCount = item.trueFalseQuestions?.count ?? 0
             
@@ -70,14 +89,52 @@ extension DocumentViewModel {
             }
             
             if needMoreMultiple {
-                await generateMultipleChoiceQuestions()
-                guard backgroundGenerationTask?.isCancelled == false else { break }
+                let result = await generateMultipleChoiceQuestions()
+                switch result {
+                case .success:
+                    consecutiveFailures = 0
+                case .retryableFailure(let error):
+                    consecutiveFailures += 1
+                    lastRetryableIssue = error
+                    Logger.generation.warning("Retryable multiple choice generation failure (\(consecutiveFailures)): \(error.userFacingMessage)")
+                case .terminalFailure:
+                    isBackgroundGenerating = false
+                    return
+                }
+                
+                if consecutiveFailures >= maxConsecutiveGenerationFailures {
+                    generationIssue = lastRetryableIssue ?? .generationFailed
+                    Logger.generation.error("Stopping background generation after too many consecutive failures")
+                    isBackgroundGenerating = false
+                    return
+                }
+                
+                guard !Task.isCancelled else { break }
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
             
             if needMoreTrueFalse {
-                await generateTrueFalseQuestions()
-                guard backgroundGenerationTask?.isCancelled == false else { break }
+                let result = await generateTrueFalseQuestions()
+                switch result {
+                case .success:
+                    consecutiveFailures = 0
+                case .retryableFailure(let error):
+                    consecutiveFailures += 1
+                    lastRetryableIssue = error
+                    Logger.generation.warning("Retryable true/false generation failure (\(consecutiveFailures)): \(error.userFacingMessage)")
+                case .terminalFailure:
+                    isBackgroundGenerating = false
+                    return
+                }
+                
+                if consecutiveFailures >= maxConsecutiveGenerationFailures {
+                    generationIssue = lastRetryableIssue ?? .generationFailed
+                    Logger.generation.error("Stopping background generation after too many consecutive failures")
+                    isBackgroundGenerating = false
+                    return
+                }
+                
+                guard !Task.isCancelled else { break }
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
             }
         }
@@ -86,14 +143,15 @@ extension DocumentViewModel {
     }
     
     @MainActor
-    private func generateMultipleChoiceQuestions() async {
+    private func generateMultipleChoiceQuestions() async -> GenerationAttemptResult {
         do {
             let questions = try await generator.generateMultipleChoiceQuestions()
-            guard backgroundGenerationTask?.isCancelled == false else { return }
+            guard !Task.isCancelled else { return .terminalFailure(.generationFailed) }
             
             withAnimation {
                 item.questions.append(contentsOf: questions)
             }
+            generationIssue = nil
             
             Logger.generation.info("Generated multiple choice questions")
             
@@ -101,17 +159,29 @@ extension DocumentViewModel {
             addNewQuestionsToSessionIfActive(questions.count, type: .multipleChoice)
             
             try? modelContext?.save()
+            return .success
+        } catch let error as GeneratorError {
+            Logger.error.error("Background generation error (multiple choice): \(error.userFacingMessage)")
+            if error.isRetryable {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                return .retryableFailure(error)
+            }
+            
+            generationIssue = error
+            stopBackgroundGeneration()
+            return .terminalFailure(error)
         } catch {
             Logger.error.error("Background generation error (multiple choice): \(error)")
             try? await Task.sleep(nanoseconds: 2_000_000_000)
+            return .retryableFailure(.generationFailed)
         }
     }
     
     @MainActor
-    private func generateTrueFalseQuestions() async {
+    private func generateTrueFalseQuestions() async -> GenerationAttemptResult {
         do {
             let questions = try await generator.generateTrueFalseQuestions()
-            guard backgroundGenerationTask?.isCancelled == false else { return }
+            guard !Task.isCancelled else { return .terminalFailure(.generationFailed) }
             
             withAnimation {
                 if item.trueFalseQuestions == nil {
@@ -119,6 +189,7 @@ extension DocumentViewModel {
                 }
                 item.trueFalseQuestions?.append(contentsOf: questions)
             }
+            generationIssue = nil
             
             Logger.generation.info("Generated true/false questions")
             
@@ -126,9 +197,21 @@ extension DocumentViewModel {
             addNewQuestionsToSessionIfActive(questions.count, type: .trueFalse)
             
             try? modelContext?.save()
+            return .success
+        } catch let error as GeneratorError {
+            Logger.error.error("Background generation error (true/false): \(error.userFacingMessage)")
+            if error.isRetryable {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                return .retryableFailure(error)
+            }
+            
+            generationIssue = error
+            stopBackgroundGeneration()
+            return .terminalFailure(error)
         } catch {
             Logger.error.error("Background generation error (true/false): \(error)")
             try? await Task.sleep(nanoseconds: 2_000_000_000)
+            return .retryableFailure(.generationFailed)
         }
     }
     

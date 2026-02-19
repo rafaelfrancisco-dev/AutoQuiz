@@ -58,7 +58,11 @@ struct DocumentView: View {
                     
                     withAnimation {
                         viewModel.item.title = title
+                        viewModel.generationIssue = nil
                     }
+                } catch let error as GeneratorError {
+                    viewModel.generationIssue = error
+                    Logger.error.error("Failed to generate title: \(error.userFacingMessage)")
                 } catch {
                     Logger.error.error("Failed to generate title: \(error.localizedDescription)")
                 }
@@ -196,7 +200,12 @@ struct DocumentView: View {
             }
             .padding()
             
-            if !viewModel.isGenerating && !hasQuestionsForType(viewModel.selectedQuestionType) {
+            if let generationIssueMessage = viewModel.generationIssueMessage {
+                Text(generationIssueMessage)
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                    .multilineTextAlignment(.center)
+            } else if !viewModel.isGenerating && !hasQuestionsForType(viewModel.selectedQuestionType) {
                 Text("Generating questions in the background...")
                     .font(.caption)
                     .foregroundColor(.secondary)

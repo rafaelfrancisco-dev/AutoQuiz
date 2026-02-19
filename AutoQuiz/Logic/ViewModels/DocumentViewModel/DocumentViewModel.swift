@@ -22,6 +22,7 @@ final class DocumentViewModel {
     var currentQuestionIndex: Int = 0
     var isBackgroundGenerating = false
     var showingResults = false
+    var generationIssue: GeneratorError?
     
     // MARK: - Quiz State
     var hasStartedQuiz = false
@@ -43,6 +44,10 @@ final class DocumentViewModel {
     var currentPoints: Int {
         // Points are now calculated from current session only
         return currentSessionAnsweredQuestions.reduce(0) { $0 + $1.pointsEarned }
+    }
+    
+    var generationIssueMessage: String? {
+        generationIssue?.userFacingMessage
     }
     
     // MARK: - Initialization
