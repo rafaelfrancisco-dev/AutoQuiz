@@ -20,6 +20,7 @@ extension DocumentViewModel {
         currentSessionAnswers.removeAll()
         currentSessionAnsweredQuestions.removeAll()
         currentSessionQuestions.removeAll()
+        currentQuestionStartedAt = nil
         lastAnswerCorrect = nil
         isWaitingForNextQuestion = false
         showingResults = false
@@ -44,6 +45,7 @@ extension DocumentViewModel {
         
         // Now mark quiz as started
         hasStartedQuiz = true
+        currentQuestionStartedAt = Date()
         lastKnownQuestionCount = currentQuestionCounts
     }
     
@@ -157,6 +159,7 @@ extension DocumentViewModel {
         currentSessionAnswers.removeAll()
         currentSessionAnsweredQuestions.removeAll() // Reset points by clearing answered questions
         currentSessionQuestions.removeAll()
+        currentQuestionStartedAt = nil
         lastAnswerCorrect = nil
         isWaitingForNextQuestion = false
     }

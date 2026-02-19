@@ -73,9 +73,19 @@ extension DocumentViewModel {
     }
     
     private func recordAnswer(_ answeredQuestion: AnsweredQuestionV1) {
+        let responseStart = currentQuestionStartedAt ?? currentQuizSession?.startTime ?? Date()
+        let responseTime = max(0, Date().timeIntervalSince(responseStart))
+        
         currentSessionAnsweredQuestions.append(answeredQuestion)
         currentSessionAnswers.insert(currentQuestionIndex)
         lastAnswerCorrect = answeredQuestion.isCorrect
+        currentQuizSession?.recordQuestionResponse(
+            questionText: answeredQuestion.questionText,
+            isCorrect: answeredQuestion.isCorrect,
+            pointsEarned: answeredQuestion.pointsEarned,
+            responseTime: responseTime
+        )
+        currentQuestionStartedAt = nil
     }
     
     @MainActor
@@ -120,6 +130,7 @@ extension DocumentViewModel {
             lastAnswerCorrect = nil
             isWaitingForNextQuestion = false
         }
+        currentQuestionStartedAt = Date()
         
         Logger.quiz.debug("Successfully navigated to question \(self.currentQuestionIndex)")
         
@@ -145,6 +156,10 @@ extension DocumentViewModel {
             withAnimation {
                 currentQuestionIndex += 1
             }
+        }
+        
+        if getCurrentSessionQuestion() != nil && !isCurrentQuestionAnswered {
+            currentQuestionStartedAt = Date()
         }
         
         // After skipping, check if we need to wait for more questions or end the quiz

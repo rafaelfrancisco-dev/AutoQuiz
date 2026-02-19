@@ -34,6 +34,7 @@ final class DocumentViewModel {
     internal var currentSessionAnsweredQuestions: [AnsweredQuestionV1] = []
     internal var currentSessionQuestions: [QuizQuestion] = []
     internal var currentQuizSession: QuizSession?
+    internal var currentQuestionStartedAt: Date?
     internal var lastAnswerCorrect: Bool?
     internal var isWaitingForNextQuestion = false
     internal var lastKnownQuestionCount: (multiple: Int, trueFalse: Int) = (0, 0)

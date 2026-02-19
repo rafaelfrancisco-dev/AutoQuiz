@@ -13,6 +13,7 @@ extension DocumentViewModel {
         selectedQuestionType = type
         currentQuestionIndex = 0
         currentSessionAnswers.removeAll()
+        currentQuestionStartedAt = nil
         lastAnswerCorrect = nil
         isWaitingForNextQuestion = false
         lastKnownQuestionCount = currentQuestionCounts
