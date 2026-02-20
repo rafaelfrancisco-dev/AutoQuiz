@@ -44,6 +44,16 @@ Primary modernization risks are:
   - background cancellation/retry behavior
   - quiz session metric recording
 
+### 4) Default actor isolation is temporarily set to `nonisolated`
+- Evidence:
+  - `/Users/rafaelfrancisco/.codex/worktrees/c8a8/AutoQuiz/AutoQuiz.xcodeproj/project.pbxproj`
+- Detail:
+  - `SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated` is currently used to avoid implicit main-actor isolation bleeding into persistence/domain code after the SwiftData -> Wax migration.
+- Impact:
+  - Safer short term for mixed UI + persistence migration, but it defers a stricter module-wide actor model.
+- Recommendation:
+  - Future migration task: return default actor isolation to `MainActor` only after separating UI state from persistence/domain APIs and explicitly annotating non-UI execution boundaries (`nonisolated`, actors, or Sendable DTOs) to prevent cross-actor regressions.
+
 ## Current Verification Snapshot
 
 - `swiftlint lint --strict --no-cache` reports high style debt:

@@ -7,6 +7,7 @@ import Foundation
 import SwiftUI
 import FoundationModels
 
+@MainActor
 @Observable
 final class DocumentViewModel {
     // MARK: - Core Properties
@@ -56,11 +57,6 @@ final class DocumentViewModel {
         self.item = item
         self.generator = Generator(item: item)
         self.appStore = appStore
-    }
-
-    // MARK: - Cleanup
-    deinit {
-        backgroundGenerationTask?.cancel()
     }
 
     func persistItemChanges() {

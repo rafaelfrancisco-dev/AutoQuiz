@@ -18,6 +18,7 @@ extension DocumentViewModel {
     
     private var maxConsecutiveGenerationFailures: Int { 5 }
     
+    @MainActor
     func startBackgroundGeneration(languageMode: Generator.QuizGenerationLanguageMode? = nil) {
         backgroundGenerationTask?.cancel()
         
@@ -33,11 +34,13 @@ extension DocumentViewModel {
         resolvedGenerationLanguageMode = nil
         generationIssue = nil
         
-        backgroundGenerationTask = Task { @MainActor in
-            await generateBackgroundQuestions(languageMode: desiredLanguageMode)
+        backgroundGenerationTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.generateBackgroundQuestions(languageMode: desiredLanguageMode)
         }
     }
     
+    @MainActor
     func stopBackgroundGeneration() {
         backgroundGenerationTask?.cancel()
         backgroundGenerationTask = nil
