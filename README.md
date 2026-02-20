@@ -23,10 +23,10 @@ AutoQuiz is an intelligent SwiftUI-based application that generates interactive 
 
 ## Requirements
 
-- **macOS**: 14.0+ (macOS Sonoma)
-- **iOS**: 17.0+
-- **Xcode**: 15.0+
-- **Swift**: 5.9+
+- **macOS**: 26.0+
+- **iOS**: 26.0+
+- **Xcode**: 26.0+
+- **Swift**: Swift toolchain in Xcode 26 (project currently uses Swift language mode 5.0)
 
 ## Installation
 

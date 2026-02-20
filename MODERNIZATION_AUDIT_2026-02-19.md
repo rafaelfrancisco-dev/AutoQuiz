@@ -25,16 +25,7 @@ Primary modernization risks are:
 - Recommendation:
   - Plan schema bump with backward-compatible decode mapping, then migrate to `answer`.
 
-### 2) Platform/tooling docs and project settings are inconsistent
-- Evidence:
-  - `/Users/rafaelfrancisco/Developer/AutoQuiz/README.md:26`
-  - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz.xcodeproj/project.pbxproj:413`
-- Detail:
-  - README lists iOS 17/macOS 14/Xcode 15 while project settings currently target 26.0 and still declare `SWIFT_VERSION = 5.0`.
-- Recommendation:
-  - Decide true baseline and supported platforms, then align README and build settings.
-
-### 3) Test coverage is placeholder-only
+### 2) Test coverage is placeholder-only
 - Evidence:
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuizTests/AutoQuizTests.swift:12`
 - Recommendation:
@@ -54,8 +45,7 @@ Primary modernization risks are:
 ## Recommended Implementation Order
 
 1. Plan and execute `anwswer` -> `answer` migration.
-2. Align project settings/README and decide platform scope.
-3. Tackle lint cleanup with an automated formatting pass + lint baseline reduction.
+2. Tackle lint cleanup with an automated formatting pass + lint baseline reduction.
 
 ## Open Decisions For Next Session
 
