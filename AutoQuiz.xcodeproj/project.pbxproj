@@ -6,6 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		91E8893B2F48C4EB00A50472 /* Wax in Frameworks */ = {isa = PBXBuildFile; productRef = 91E8893A2F48C4EB00A50472 /* Wax */; };
+		91E8893D2F48C4EB00A50472 /* WaxCore in Frameworks */ = {isa = PBXBuildFile; productRef = 91E8893C2F48C4EB00A50472 /* WaxCore */; };
+		91E8893F2F48C4EB00A50472 /* WaxTextSearch in Frameworks */ = {isa = PBXBuildFile; productRef = 91E8893E2F48C4EB00A50472 /* WaxTextSearch */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		915FC3B42DF87D46003A098C /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +58,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				91E8893D2F48C4EB00A50472 /* WaxCore in Frameworks */,
+				91E8893F2F48C4EB00A50472 /* WaxTextSearch in Frameworks */,
+				91E8893B2F48C4EB00A50472 /* Wax in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +121,9 @@
 			);
 			name = AutoQuiz;
 			packageProductDependencies = (
+				91E8893A2F48C4EB00A50472 /* Wax */,
+				91E8893C2F48C4EB00A50472 /* WaxCore */,
+				91E8893E2F48C4EB00A50472 /* WaxTextSearch */,
 			);
 			productName = AutoQuiz;
 			productReference = 915FC3A42DF87D44003A098C /* AutoQuiz.app */;
@@ -195,6 +207,9 @@
 			);
 			mainGroup = 915FC39B2DF87D44003A098C;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				91E889392F48C4EB00A50472 /* XCRemoteSwiftPackageReference "Wax" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 915FC3A52DF87D44003A098C /* Products */;
 			projectDirPath = "";
@@ -655,6 +670,35 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		91E889392F48C4EB00A50472 /* XCRemoteSwiftPackageReference "Wax" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/christopherkarani/Wax.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.1.7;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		91E8893A2F48C4EB00A50472 /* Wax */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 91E889392F48C4EB00A50472 /* XCRemoteSwiftPackageReference "Wax" */;
+			productName = Wax;
+		};
+		91E8893C2F48C4EB00A50472 /* WaxCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 91E889392F48C4EB00A50472 /* XCRemoteSwiftPackageReference "Wax" */;
+			productName = WaxCore;
+		};
+		91E8893E2F48C4EB00A50472 /* WaxTextSearch */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 91E889392F48C4EB00A50472 /* XCRemoteSwiftPackageReference "Wax" */;
+			productName = WaxTextSearch;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 915FC39C2DF87D44003A098C /* Project object */;
 }

@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import SwiftData
 import OSLog
 
 struct GenerationLoadingIndicator: View {
@@ -26,7 +25,7 @@ struct GenerationLoadingIndicator: View {
 }
 
 struct DocumentView: View {
-    @Environment(\.modelContext) private var modelContext
+    @Environment(AppStore.self) private var appStore
     
     @State private var viewModel: DocumentViewModel
     @State private var showingHistoricalQuestions = false
@@ -61,6 +60,7 @@ struct DocumentView: View {
                         viewModel.item.title = title
                         viewModel.generationIssue = nil
                     }
+                    viewModel.persistItemChanges()
                 } catch let error as GeneratorError {
                     viewModel.generationIssue = error
                     Logger.error.error("Failed to generate title: \(error.userFacingMessage)")
@@ -136,7 +136,7 @@ struct DocumentView: View {
             fallbackLanguageSheet
         }
         .onAppear {
-            viewModel.modelContext = modelContext
+            viewModel.appStore = appStore
         }
         .onDisappear {
             viewModel.stopBackgroundGeneration()
@@ -500,4 +500,5 @@ struct DocumentView: View {
 
 #Preview {
     DocumentView(item: Item(timestamp: .now, content: "Test"))
+        .environment(AppStore())
 }

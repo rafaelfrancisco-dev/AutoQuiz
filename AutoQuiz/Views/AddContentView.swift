@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import SwiftData
 import UniformTypeIdentifiers
 #if canImport(PDFKit)
 import PDFKit
@@ -21,7 +20,7 @@ import AppKit
 struct AddContentView: View {
     let item: Item
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
+    @Environment(AppStore.self) private var appStore
     
     @State private var isPickerPresented = false
     @State private var errorMessage: String?
@@ -289,13 +288,11 @@ struct AddContentView: View {
     
     private func appendContent(_ content: String) {
         item.appendContentAndAdvanceRevision(content)
-        
-        // Save changes
-        do {
-            try modelContext.save()
-            successMessage = "Content added successfully! Questions will be regenerated."
-        } catch {
-            errorMessage = "Failed to save changes: \(error.localizedDescription)"
+        Task {
+            await appStore.saveItem(item)
+            await MainActor.run {
+                successMessage = "Content added successfully! Questions will be regenerated."
+            }
         }
     }
 }
@@ -303,4 +300,5 @@ struct AddContentView: View {
 #Preview {
     let sampleItem = Item(timestamp: .now, content: "Sample existing content")
     AddContentView(item: sampleItem)
+        .environment(AppStore())
 }
