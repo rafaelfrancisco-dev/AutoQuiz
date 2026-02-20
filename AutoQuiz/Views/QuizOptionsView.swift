@@ -187,7 +187,7 @@ struct QuizOptionsView: View {
                 
                 Toggle("Use Original Document Language", isOn: $settings.useOriginalLanguage)
                 
-                Text("When enabled, questions will be generated in the original language of the document. When disabled, questions will be generated in your app's language.")
+                Text("When enabled, questions are generated using the detected document language. If unsupported, you'll choose a supported language. When disabled, questions use your app language (with the same fallback choice if needed).")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -260,7 +260,7 @@ struct QuizOptionsView: View {
         } header: {
             Text("Language Settings")
         } footer: {
-            Text("When enabled, questions will be generated in the original language of the document. When disabled, questions will be generated in your app's language.")
+            Text("When enabled, questions are generated using the detected document language. If unsupported, you'll choose a supported language. When disabled, questions use your app language (with the same fallback choice if needed).")
         }
         #endif
     }

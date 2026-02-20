@@ -28,6 +28,10 @@ final class DocumentViewModel {
     var hasStartedQuiz = false
     var selectedQuestionType: Question = .multipleChoice
     var currentQuizSettings = QuizSettings.default
+    var activeGenerationLanguageMode: Generator.QuizGenerationLanguageMode?
+    var resolvedGenerationLanguageMode: Generator.QuizGenerationLanguageMode?
+    var pendingSupportedLanguages: [Locale.Language] = []
+    var isShowingLanguageSelection = false
     
     // MARK: - Internal State (accessed by extensions)
     internal var currentSessionAnswers: Set<Int> = []

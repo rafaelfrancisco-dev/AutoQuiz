@@ -7,6 +7,7 @@
 
 import Foundation
 import FoundationModels
+import NaturalLanguage
 
 enum GeneratorError: Error, Equatable {
     case deviceNotEligible
@@ -64,6 +65,17 @@ struct TrueFalseQuestionBatch: Codable {
 }
 
 final class Generator {
+    enum QuizGenerationLanguageMode: Equatable {
+        case detectedDocumentLanguage
+        case appLocale(Locale)
+        case specificLanguage(Locale.Language)
+    }
+    
+    enum GenerationLanguageResolution: Equatable {
+        case resolved(Locale.Language)
+        case requiresUserSelection([Locale.Language])
+    }
+    
     let item: Item
     private let model = SystemLanguageModel.default
     
@@ -106,24 +118,85 @@ final class Generator {
         }
     }
     
-    func currentAvailabilityIssue(locale: Locale = .current) -> GeneratorError? {
-        if let availabilityIssue = Self.mapAvailability(model.availability) {
-            return availabilityIssue
+    static func currentAvailabilityIssue() -> GeneratorError? {
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            return nil
         }
-        
-        guard model.supportsLocale(locale) else {
-            return .unsupportedLanguageOrLocale
-        }
-        
-        return nil
+        return Self.mapAvailability(SystemLanguageModel.default.availability)
     }
     
-    private func createSession() throws -> LanguageModelSession {
-        if let issue = currentAvailabilityIssue() {
+    func currentAvailabilityIssue() -> GeneratorError? {
+        Self.currentAvailabilityIssue()
+    }
+    
+    func supportedLanguages() -> [Locale.Language] {
+        model.supportedLanguages.sorted { $0.persistedIdentifier < $1.persistedIdentifier }
+    }
+    
+    func resolveLanguage(mode: QuizGenerationLanguageMode) -> GenerationLanguageResolution {
+        guard Self.currentAvailabilityIssue() == nil else {
+            return .requiresUserSelection([])
+        }
+        
+        let supportedLanguages = supportedLanguages()
+        
+        func isSupported(_ language: Locale.Language) -> Bool {
+            model.supportedLanguages.contains(language)
+        }
+        
+        switch mode {
+        case .specificLanguage(let language):
+            return isSupported(language) ? .resolved(language) : .requiresUserSelection(supportedLanguages)
+        case .appLocale(let locale):
+            if model.supportsLocale(locale) {
+                return .resolved(locale.language)
+            }
+            return .requiresUserSelection(supportedLanguages)
+        case .detectedDocumentLanguage:
+            guard let detectedLanguage = detectDocumentLanguage(in: item.content) else {
+                return .requiresUserSelection(supportedLanguages)
+            }
+            return isSupported(detectedLanguage) ? .resolved(detectedLanguage) : .requiresUserSelection(supportedLanguages)
+        }
+    }
+    
+    private func resolveLanguageOrThrow(mode: QuizGenerationLanguageMode) throws -> Locale.Language {
+        switch resolveLanguage(mode: mode) {
+        case .resolved(let language):
+            return language
+        case .requiresUserSelection:
+            throw GeneratorError.unsupportedLanguageOrLocale
+        }
+    }
+    
+    private func detectDocumentLanguage(in content: String) -> Locale.Language? {
+        let sample = String(content.prefix(maxChunkSize))
+        guard !sample.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(sample)
+        
+        guard let dominantLanguage = recognizer.dominantLanguage else {
+            return nil
+        }
+        
+        return Locale.Language(identifier: dominantLanguage.rawValue)
+    }
+    
+    private func createSession(language: Locale.Language) throws -> LanguageModelSession {
+        if let issue = Self.currentAvailabilityIssue() {
             throw issue
         }
         
-        return LanguageModelSession(instructions: "Always answer in English (en-US).")
+        let localeIdentifier = Locale(identifier: language.persistedIdentifier).identifier
+        let instructions = """
+        The person's locale is \(localeIdentifier).
+        You MUST respond in \(localeIdentifier).
+        """
+        
+        return LanguageModelSession(instructions: instructions)
     }
     
     private func getRandomContentChunk() -> String {
@@ -137,8 +210,9 @@ final class Generator {
         return chunks.randomElement() ?? String(content.prefix(maxChunkSize))
     }
     
-    func generateMultipleChoiceQuestions() async throws -> [MultipleChoiceQuestion] {
-        let session = try createSession()
+    func generateMultipleChoiceQuestions(languageMode: QuizGenerationLanguageMode) async throws -> [MultipleChoiceQuestion] {
+        let language = try resolveLanguageOrThrow(mode: languageMode)
+        let session = try createSession(language: language)
         
         let textToPrompt = getRandomContentChunk()
         do {
@@ -152,8 +226,9 @@ final class Generator {
         }
     }
     
-    func generateTrueFalseQuestions() async throws -> [TrueFalseQuestion] {
-        let session = try createSession()
+    func generateTrueFalseQuestions(languageMode: QuizGenerationLanguageMode) async throws -> [TrueFalseQuestion] {
+        let language = try resolveLanguageOrThrow(mode: languageMode)
+        let session = try createSession(language: language)
         
         let textToPrompt = getRandomContentChunk()
         do {
@@ -168,7 +243,7 @@ final class Generator {
     }
     
     func generateTitle() async throws -> String {
-        let session = try createSession()
+        let session = try createSession(language: .init(identifier: "en-US"))
         
         let textToPrompt = getRandomContentChunk()
         do {

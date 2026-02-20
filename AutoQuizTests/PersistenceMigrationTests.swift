@@ -8,7 +8,7 @@ struct PersistenceMigrationTests {
     func modelContainerBootUsesExpectedMigrationPlanAndSchemaVersion() throws {
         ItemMigrationPlan.validateLatestSchemaIsCurrent()
 
-        let currentSchema = Schema(SchemaV2.models, version: SchemaV2.versionIdentifier)
+        let currentSchema = Schema(SchemaV3.models, version: SchemaV3.versionIdentifier)
         let storeDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         let storeURL = storeDirectory.appendingPathComponent("AutoQuizMigrationTest.store")
@@ -31,6 +31,6 @@ struct PersistenceMigrationTests {
         }
 
         #expect(ObjectIdentifier(migrationPlan) == ObjectIdentifier(ItemMigrationPlan.self))
-        #expect(container.schema.version == SchemaV2.versionIdentifier)
+        #expect(container.schema.version == SchemaV3.versionIdentifier)
     }
 }

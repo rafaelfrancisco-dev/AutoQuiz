@@ -34,6 +34,7 @@ struct DocumentView: View {
     @State private var showingAddContent = false
     @State private var showingAnalytics = false
     @State private var showingSpacedRepetition = false
+    @State private var selectedFallbackLanguageIdentifier: String?
     
     init(item: Item) {
         self.viewModel = DocumentViewModel(item: item)
@@ -131,6 +132,9 @@ struct DocumentView: View {
         .sheet(isPresented: $showingSpacedRepetition) {
             SpacedRepetitionView(document: viewModel.item)
         }
+        .sheet(isPresented: $viewModel.isShowingLanguageSelection) {
+            fallbackLanguageSheet
+        }
         .onAppear {
             viewModel.modelContext = modelContext
         }
@@ -148,6 +152,57 @@ struct DocumentView: View {
         } message: {
             Text("Questions answered: \(viewModel.quizResults.totalQuestions)\nCorrect answers: \(viewModel.quizResults.correctAnswers)\nPoints earned: \(viewModel.quizResults.totalPoints)")
         }
+    }
+    
+    @ViewBuilder
+    private var fallbackLanguageSheet: some View {
+        NavigationStack {
+            List {
+                ForEach(viewModel.pendingSupportedLanguages, id: \.persistedIdentifier) { language in
+                    Button {
+                        selectedFallbackLanguageIdentifier = language.persistedIdentifier
+                    } label: {
+                        HStack {
+                            Text(localizedLanguageName(for: language))
+                            Spacer()
+                            if selectedFallbackLanguageIdentifier == language.persistedIdentifier {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(.blue)
+                            }
+                        }
+                    }
+                    .foregroundStyle(.primary)
+                }
+            }
+            .navigationTitle("Choose Language")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        viewModel.isShowingLanguageSelection = false
+                    }
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Continue") {
+                        guard let selectedFallbackLanguageIdentifier else { return }
+                        let language = Locale.Language(identifier: selectedFallbackLanguageIdentifier)
+                        viewModel.applyFallbackLanguage(language)
+                    }
+                    .disabled(selectedFallbackLanguageIdentifier == nil)
+                }
+            }
+        }
+        .onAppear {
+            if selectedFallbackLanguageIdentifier == nil {
+                selectedFallbackLanguageIdentifier = viewModel.pendingSupportedLanguages.first?.persistedIdentifier
+            }
+        }
+    }
+    
+    private func localizedLanguageName(for language: Locale.Language) -> String {
+        let locale = Locale.current
+        let localized = locale.localizedString(forLanguageCode: language.displayIdentifier)
+        return localized ?? language.persistedIdentifier
     }
     
     private var hasQuestions: Bool {

@@ -15,7 +15,7 @@ struct AutoQuizApp: App {
         do {
             ItemMigrationPlan.validateLatestSchemaIsCurrent()
 
-            let currentSchema = Schema(SchemaV2.models, version: SchemaV2.versionIdentifier)
+            let currentSchema = Schema(SchemaV3.models, version: SchemaV3.versionIdentifier)
             let configuration = try makeModelConfiguration(for: currentSchema)
             return try ModelContainer(
                 for: currentSchema,
@@ -40,19 +40,10 @@ struct AutoQuizApp: App {
             return ModelConfiguration(isStoredInMemoryOnly: false)
         }
 
-        let environment = ProcessInfo.processInfo.environment
-        let fallbackProjectPath = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .path
-
-        let projectPath = environment["PROJECT_DIR"]
-            ?? environment["SOURCE_ROOT"]
-            ?? environment["SRCROOT"]
-            ?? fallbackProjectPath
-
-        let projectURL = URL(fileURLWithPath: projectPath, isDirectory: true)
-        let storeDirectory = projectURL.appendingPathComponent(".swiftdata", isDirectory: true)
+        // Use a per-run temporary store path to avoid sandbox write restrictions and
+        // stale store metadata from previous test runs.
+        let storeDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AutoQuizTests-\(UUID().uuidString)", isDirectory: true)
         let storeURL = storeDirectory.appendingPathComponent("AutoQuizTests.store")
 
         try FileManager.default.createDirectory(at: storeDirectory, withIntermediateDirectories: true)

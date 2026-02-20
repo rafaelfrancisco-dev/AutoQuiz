@@ -14,6 +14,22 @@ extension DocumentViewModel {
         currentQuizSettings = settings
         selectedQuestionType = settings.questionType
         
+        let desiredLanguageMode: Generator.QuizGenerationLanguageMode
+        if let fallbackIdentifier = item.preferredFallbackLanguageIdentifier {
+            desiredLanguageMode = .specificLanguage(Locale.Language(identifier: fallbackIdentifier))
+        } else {
+            desiredLanguageMode = settings.useOriginalLanguage ? .detectedDocumentLanguage : .appLocale(.current)
+        }
+        
+        if activeGenerationLanguageMode != desiredLanguageMode {
+            item.questions.removeAll()
+            item.trueFalseQuestions?.removeAll()
+            stopBackgroundGeneration()
+            startBackgroundGeneration(languageMode: desiredLanguageMode)
+        } else if backgroundGenerationTask == nil {
+            startBackgroundGeneration(languageMode: desiredLanguageMode)
+        }
+        
         // COMPLETELY RESET all session state
         hasStartedQuiz = false
         currentQuestionIndex = 0

@@ -19,20 +19,23 @@ extension DocumentViewModel {
     
     private var maxConsecutiveGenerationFailures: Int { 5 }
     
-    func startBackgroundGeneration() {
+    func startBackgroundGeneration(languageMode: Generator.QuizGenerationLanguageMode? = nil) {
         backgroundGenerationTask?.cancel()
         
-        if let issue = generator.currentAvailabilityIssue() {
+        if let issue = Generator.currentAvailabilityIssue() {
             generationIssue = issue
             isBackgroundGenerating = false
             isWaitingForNextQuestion = false
             return
         }
         
+        let desiredLanguageMode = languageMode ?? defaultGenerationLanguageMode()
+        activeGenerationLanguageMode = desiredLanguageMode
+        resolvedGenerationLanguageMode = nil
         generationIssue = nil
         
         backgroundGenerationTask = Task { @MainActor in
-            await generateBackgroundQuestions()
+            await generateBackgroundQuestions(languageMode: desiredLanguageMode)
         }
     }
     
@@ -44,7 +47,7 @@ extension DocumentViewModel {
     }
     
     @MainActor
-    private func generateBackgroundQuestions() async {
+    private func generateBackgroundQuestions(languageMode: Generator.QuizGenerationLanguageMode) async {
         guard !Task.isCancelled else { return }
         
         Logger.generation.debug("Starting background generation")
@@ -89,7 +92,7 @@ extension DocumentViewModel {
             }
             
             if needMoreMultiple {
-                let result = await generateMultipleChoiceQuestions()
+                let result = await generateMultipleChoiceQuestions(languageMode: languageMode)
                 switch result {
                 case .success:
                     consecutiveFailures = 0
@@ -114,7 +117,7 @@ extension DocumentViewModel {
             }
             
             if needMoreTrueFalse {
-                let result = await generateTrueFalseQuestions()
+                let result = await generateTrueFalseQuestions(languageMode: languageMode)
                 switch result {
                 case .success:
                     consecutiveFailures = 0
@@ -143,10 +146,11 @@ extension DocumentViewModel {
     }
     
     @MainActor
-    private func generateMultipleChoiceQuestions() async -> GenerationAttemptResult {
+    private func generateMultipleChoiceQuestions(languageMode: Generator.QuizGenerationLanguageMode) async -> GenerationAttemptResult {
         do {
-            let questions = try await generator.generateMultipleChoiceQuestions()
+            let questions = try await generator.generateMultipleChoiceQuestions(languageMode: languageMode)
             guard !Task.isCancelled else { return .terminalFailure(.generationFailed) }
+            resolvedGenerationLanguageMode = languageMode
             
             withAnimation {
                 item.questions.append(contentsOf: questions)
@@ -162,6 +166,11 @@ extension DocumentViewModel {
             return .success
         } catch let error as GeneratorError {
             Logger.error.error("Background generation error (multiple choice): \(error.userFacingMessage)")
+            if error == .unsupportedLanguageOrLocale {
+                handleUnsupportedLanguage(for: languageMode)
+                stopBackgroundGeneration()
+                return .terminalFailure(error)
+            }
             if error.isRetryable {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 return .retryableFailure(error)
@@ -178,10 +187,11 @@ extension DocumentViewModel {
     }
     
     @MainActor
-    private func generateTrueFalseQuestions() async -> GenerationAttemptResult {
+    private func generateTrueFalseQuestions(languageMode: Generator.QuizGenerationLanguageMode) async -> GenerationAttemptResult {
         do {
-            let questions = try await generator.generateTrueFalseQuestions()
+            let questions = try await generator.generateTrueFalseQuestions(languageMode: languageMode)
             guard !Task.isCancelled else { return .terminalFailure(.generationFailed) }
+            resolvedGenerationLanguageMode = languageMode
             
             withAnimation {
                 if item.trueFalseQuestions == nil {
@@ -200,6 +210,11 @@ extension DocumentViewModel {
             return .success
         } catch let error as GeneratorError {
             Logger.error.error("Background generation error (true/false): \(error.userFacingMessage)")
+            if error == .unsupportedLanguageOrLocale {
+                handleUnsupportedLanguage(for: languageMode)
+                stopBackgroundGeneration()
+                return .terminalFailure(error)
+            }
             if error.isRetryable {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 return .retryableFailure(error)
@@ -266,5 +281,46 @@ extension DocumentViewModel {
             Logger.generation.debug("Auto-advancing to newly generated question")
             navigateToNextQuestion()
         }
+    }
+
+    @MainActor
+    func defaultGenerationLanguageMode() -> Generator.QuizGenerationLanguageMode {
+        if let fallbackIdentifier = item.preferredFallbackLanguageIdentifier {
+            return .specificLanguage(Locale.Language(identifier: fallbackIdentifier))
+        }
+        
+        return currentQuizSettings.useOriginalLanguage ? .detectedDocumentLanguage : .appLocale(.current)
+    }
+    
+    @MainActor
+    func handleUnsupportedLanguage(for languageMode: Generator.QuizGenerationLanguageMode) {
+        switch generator.resolveLanguage(mode: languageMode) {
+        case .resolved:
+            break
+        case .requiresUserSelection(let supportedLanguages):
+            pendingSupportedLanguages = supportedLanguages
+            isShowingLanguageSelection = !supportedLanguages.isEmpty
+            generationIssue = supportedLanguages.isEmpty ? .unsupportedLanguageOrLocale : nil
+        }
+    }
+    
+    @MainActor
+    func applyFallbackLanguage(_ language: Locale.Language) {
+        item.preferredFallbackLanguageIdentifier = language.persistedIdentifier
+        isShowingLanguageSelection = false
+        pendingSupportedLanguages = []
+        generationIssue = nil
+        
+        withAnimation {
+            item.questions.removeAll()
+            item.trueFalseQuestions?.removeAll()
+        }
+        
+        try? modelContext?.save()
+        
+        let fallbackMode = Generator.QuizGenerationLanguageMode.specificLanguage(language)
+        activeGenerationLanguageMode = fallbackMode
+        resolvedGenerationLanguageMode = fallbackMode
+        startBackgroundGeneration(languageMode: fallbackMode)
     }
 }

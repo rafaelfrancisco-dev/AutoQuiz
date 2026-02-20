@@ -9,7 +9,7 @@ import Foundation
 import SwiftData
 import OSLog
 
-typealias Item = ItemV2
+typealias Item = ItemV3
 typealias AnsweredQuestion = AnsweredQuestionV1
 
 enum Question: String, Codable, CaseIterable {
@@ -46,14 +46,22 @@ enum SchemaV2: VersionedSchema {
     }
 }
 
+enum SchemaV3: VersionedSchema {
+    static var versionIdentifier = Schema.Version(3, 0, 0)
+    
+    static var models: [any PersistentModel.Type] {
+        [ItemV3.self, AnsweredQuestionV1.self, QuizSession.self, SpacedRepetitionCard.self]
+    }
+}
+
 // Migration plan
 enum ItemMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [SchemaV1.self, SchemaV2.self]
+        [SchemaV1.self, SchemaV2.self, SchemaV3.self]
     }
     
     static var stages: [MigrationStage] {
-        [migrateV1toV2]
+        [migrateV1toV2, migrateV2toV3]
     }
     
     static let migrateV1toV2 = MigrationStage.custom(
@@ -68,8 +76,19 @@ enum ItemMigrationPlan: SchemaMigrationPlan {
             Logger.database.info("Completed migration from V1 to V2")
         }
     )
+    
+    static let migrateV2toV3 = MigrationStage.custom(
+        fromVersion: SchemaV2.self,
+        toVersion: SchemaV3.self,
+        willMigrate: { context in
+            Logger.database.info("Starting migration from V2 to V3 - adding preferred fallback language")
+        },
+        didMigrate: { context in
+            Logger.database.info("Completed migration from V2 to V3")
+        }
+    )
 
-    static func validateLatestSchemaIsCurrent(expectedLatestSchema: any VersionedSchema.Type = SchemaV2.self) {
+    static func validateLatestSchemaIsCurrent(expectedLatestSchema: any VersionedSchema.Type = SchemaV3.self) {
         guard let latestSchema = schemas.last else {
             preconditionFailure("Migration plan has no schemas. Expected latest schema: \(expectedLatestSchema.versionIdentifier)")
         }

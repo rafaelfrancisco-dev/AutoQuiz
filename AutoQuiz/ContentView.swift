@@ -20,70 +20,107 @@ import AppKit
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @Query private var items: [Item]
 
     @State private var isPickerPresented = false
     @State private var pickedFileURL: URL?
     @State private var errorMessage: String?
     @State private var selectedItemID: Item.ID?
+    @State private var appAvailabilityIssue: GeneratorError?
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $selectedItemID) {
-                ForEach(items) { item in
-                    NavigationLink(value: item.id) {
-                        if let title = item.title {
-                            Text(title)
-                        } else {
-                            Text(item.content.prefix(40))
+        Group {
+            if let appAvailabilityIssue {
+                unavailableView(for: appAvailabilityIssue)
+            } else {
+                NavigationSplitView {
+                    List(selection: $selectedItemID) {
+                        ForEach(items) { item in
+                            NavigationLink(value: item.id) {
+                                if let title = item.title {
+                                    Text(title)
+                                } else {
+                                    Text(item.content.prefix(40))
+                                }
+                            }
+                        }
+                        .onDelete(perform: deleteItems)
+                    }
+#if os(macOS)
+                    .navigationSplitViewColumnWidth(min: 180, ideal: 200)
+#endif
+                    .navigationTitle("Documents")
+                    .toolbar {
+#if os(iOS)
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            EditButton()
+                        }
+#endif
+                        ToolbarItem(placement: .navigation) {
+                            Button(action: addItem) {
+                                Label("Add Item", systemImage: "plus")
+                            }
                         }
                     }
-                }
-                .onDelete(perform: deleteItems)
-            }
-#if os(macOS)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-#endif
-            .navigationTitle("Documents")
-            .toolbar {
 #if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
+                    .sheet(isPresented: $isPickerPresented) {
+#if os(iOS)
+                        DocumentPicker { url in
+                            if let url = url {
+                                handlePickedFile(url: url)
+                            }
+                        }
 #endif
-                ToolbarItem(placement: .navigation) {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
+                    }
+#endif
+                    .alert(isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+                        Alert(
+                            title: Text("Error"),
+                            message: Text(errorMessage ?? ""),
+                            dismissButton: .default(Text("OK")) { errorMessage = nil }
+                        )
+                    }
+                } detail: {
+                    if let selID = selectedItemID,
+                       let selectedItem = items.first(where: { $0.id == selID })
+                    {
+                        DocumentView(item: selectedItem)
+                    } else {
+                        Text("Select an item")
                     }
                 }
-            }
-#if os(iOS)
-            .sheet(isPresented: $isPickerPresented) {
-#if os(iOS)
-                DocumentPicker { url in
-                    if let url = url {
-                        handlePickedFile(url: url)
-                    }
-                }
-#endif
-            }
-#endif
-            .alert(isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
-                Alert(
-                    title: Text("Error"),
-                    message: Text(errorMessage ?? ""),
-                    dismissButton: .default(Text("OK")) { errorMessage = nil }
-                )
-            }
-        } detail: {
-            if let selID = selectedItemID,
-               let selectedItem = items.first(where: { $0.id == selID })
-            {
-                DocumentView(item: selectedItem)
-            } else {
-                Text("Select an item")
             }
         }
+        .task {
+            refreshAppAvailability()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                refreshAppAvailability()
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func unavailableView(for issue: GeneratorError) -> some View {
+        VStack(spacing: 16) {
+            Text("Apple Intelligence Required")
+                .font(.title2)
+                .bold()
+            Text(issue.userFacingMessage)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+            Button("Retry") {
+                refreshAppAvailability()
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(24)
+    }
+    
+    private func refreshAppAvailability() {
+        appAvailabilityIssue = Generator.currentAvailabilityIssue()
     }
 
 #if os(iOS)
