@@ -34,17 +34,7 @@ Primary modernization risks are:
 - Recommendation:
   - Decide true baseline and supported platforms, then align README and build settings.
 
-### 3) Quiz language option is not wired into generation
-- Evidence:
-  - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Models/QuizSettings.swift:48`
-  - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Views/QuizOptionsView.swift:188`
-  - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Logic/Generator.swift:39`
-- Detail:
-  - UI exposes `useOriginalLanguage`, but generation currently hardcodes English instructions.
-- Recommendation:
-  - Thread quiz language setting into Generator and locale support checks.
-
-### 4) Content edits do not invalidate all derived artifacts
+### 3) Content edits do not invalidate all derived artifacts
 - Evidence:
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Views/AddContentView.swift:295`
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Views/SpacedRepetition/SpacedRepetitionView.swift:303`
@@ -53,7 +43,7 @@ Primary modernization risks are:
 - Recommendation:
   - Define explicit invalidation/versioning policy for sessions and spaced repetition cards on content mutation.
 
-### 5) Test coverage is placeholder-only
+### 4) Test coverage is placeholder-only
 - Evidence:
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuizTests/AutoQuizTests.swift:12`
 - Recommendation:
