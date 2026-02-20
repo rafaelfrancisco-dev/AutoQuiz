@@ -18,6 +18,7 @@ struct SpacedRepetitionView: View {
     @State private var startTime = Date()
     @State private var isSessionComplete = false
     @State private var sessionStats: SessionStats?
+    @State private var selectedRevisionSelection: ContentRevisionSelection = .current
     
     let document: Item?
     
@@ -28,6 +29,10 @@ struct SpacedRepetitionView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
+                if document != nil {
+                    versionSelector
+                }
+                
                 if let session = currentSession {
                     if !isSessionComplete {
                         activeSessionView(session: session)
@@ -77,6 +82,9 @@ struct SpacedRepetitionView: View {
         }
         .onAppear {
             setupService()
+            startSession()
+        }
+        .onChange(of: selectedRevisionSelection) { _, _ in
             startSession()
         }
     }
@@ -289,6 +297,20 @@ struct SpacedRepetitionView: View {
         }
     }
     
+    private var versionSelector: some View {
+        HStack {
+            Picker("Content Version", selection: $selectedRevisionSelection) {
+                ForEach(revisionOptions, id: \.self) { selection in
+                    Text(selection.displayName(for: document))
+                        .tag(selection)
+                }
+            }
+            .pickerStyle(.menu)
+            
+            Spacer()
+        }
+    }
+    
     // MARK: - Helper Methods
     
     private func setupService() {
@@ -297,15 +319,28 @@ struct SpacedRepetitionView: View {
     
     private func startSession() {
         guard let service = spacedRepetitionService else { return }
+        let selectedSourceContentRevision = selectedRevisionSelection.resolvedRevision(for: document)
         
         // Check if we need to create cards for this document
         if let document = document {
-            let existingCards = service.getAllCards(for: document)
-            if existingCards.isEmpty {
+            let existingCards = service.getAllCards(
+                for: document,
+                sourceContentRevision: selectedSourceContentRevision
+            )
+            let shouldCreateCardsForCurrentRevision =
+                selectedSourceContentRevision == nil || selectedSourceContentRevision == document.contentRevision
+            
+            if existingCards.isEmpty && shouldCreateCardsForCurrentRevision {
                 Task {
-                    await service.createCardsFromQuestions(for: document)
+                    await service.createCardsFromQuestions(
+                        for: document,
+                        sourceContentRevision: selectedSourceContentRevision
+                    )
                     await MainActor.run {
-                        self.currentSession = service.startReviewSession(for: document)
+                        self.currentSession = service.startReviewSession(
+                            for: document,
+                            sourceContentRevision: selectedSourceContentRevision
+                        )
                     }
                 }
                 return
@@ -313,10 +348,14 @@ struct SpacedRepetitionView: View {
         }
         
         // Start session with existing cards
-        currentSession = service.startReviewSession(for: document)
+        currentSession = service.startReviewSession(
+            for: document,
+            sourceContentRevision: selectedSourceContentRevision
+        )
         showingAnswer = false
         isSessionComplete = false
         sessionStats = nil
+        startTime = Date()
     }
     
     private func recordAnswer(quality: Int) {
@@ -358,6 +397,18 @@ struct SpacedRepetitionView: View {
             averageTime: averageTime,
             perfectRecalls: perfectRecalls
         )
+    }
+    
+    private var revisionOptions: [ContentRevisionSelection] {
+        guard let document else {
+            return [.current]
+        }
+        
+        var options: [ContentRevisionSelection] = [.current]
+        options.append(contentsOf: document.availableContentRevisions
+            .filter { $0 != document.contentRevision }
+            .map(ContentRevisionSelection.revision))
+        return options
     }
 }
 

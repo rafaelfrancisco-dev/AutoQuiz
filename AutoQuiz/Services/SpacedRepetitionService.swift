@@ -20,8 +20,9 @@ final class SpacedRepetitionService {
     // MARK: - Card Management
     
     /// Creates spaced repetition cards from existing questions
-    func createCardsFromQuestions(for document: Item) async {
+    func createCardsFromQuestions(for document: Item, sourceContentRevision: Int? = nil) async {
         var newCards: [SpacedRepetitionCard] = []
+        let resolvedRevision = sourceContentRevision ?? document.contentRevision
         
         // Create cards from multiple choice questions
         for question in document.questions {
@@ -31,7 +32,8 @@ final class SpacedRepetitionService {
                     answerText: question.anwswer,
                     questionType: .multipleChoice,
                     originalQuestionData: cardData,
-                    document: document
+                    document: document,
+                    sourceContentRevision: resolvedRevision
                 )
                 newCards.append(card)
             }
@@ -46,7 +48,8 @@ final class SpacedRepetitionService {
                         answerText: question.isTrue ? "True" : "False",
                         questionType: .trueFalse,
                         originalQuestionData: cardData,
-                        document: document
+                        document: document,
+                        sourceContentRevision: resolvedRevision
                     )
                     newCards.append(card)
                 }
@@ -67,7 +70,11 @@ final class SpacedRepetitionService {
     }
     
     /// Gets cards that are due for review
-    func getDueCards(for document: Item? = nil, limit: Int = 20) -> [SpacedRepetitionCard] {
+    func getDueCards(
+        for document: Item? = nil,
+        sourceContentRevision: Int? = nil,
+        limit: Int = 20
+    ) -> [SpacedRepetitionCard] {
         let descriptor = FetchDescriptor<SpacedRepetitionCard>(
             sortBy: [
                 SortDescriptor(\.nextReviewDate),
@@ -81,7 +88,8 @@ final class SpacedRepetitionService {
             let filteredCards = allCards.filter { card in
                 let isDue = card.isDue
                 let matchesDocument = document == nil || card.document?.id == document?.id
-                return isDue && matchesDocument
+                let matchesRevision = sourceContentRevision == nil || card.sourceContentRevision == sourceContentRevision
+                return isDue && matchesDocument && matchesRevision
             }
             
             return Array(filteredCards.prefix(limit))
@@ -92,14 +100,17 @@ final class SpacedRepetitionService {
     }
     
     /// Gets all cards for a specific document
-    func getAllCards(for document: Item) -> [SpacedRepetitionCard] {
+    func getAllCards(for document: Item, sourceContentRevision: Int? = nil) -> [SpacedRepetitionCard] {
         let descriptor = FetchDescriptor<SpacedRepetitionCard>(
             sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
         )
         
         do {
             let allCards = try modelContext.fetch(descriptor)
-            return allCards.filter { $0.document?.id == document.id }
+            return allCards.filter {
+                $0.document?.id == document.id &&
+                (sourceContentRevision == nil || $0.sourceContentRevision == sourceContentRevision)
+            }
         } catch {
             Logger.error.error("Failed to fetch cards for document: \(error)")
             return []
@@ -107,7 +118,11 @@ final class SpacedRepetitionService {
     }
     
     /// Gets cards in learning phase (new cards or those being relearned)
-    func getLearningCards(for document: Item? = nil, limit: Int = 10) -> [SpacedRepetitionCard] {
+    func getLearningCards(
+        for document: Item? = nil,
+        sourceContentRevision: Int? = nil,
+        limit: Int = 10
+    ) -> [SpacedRepetitionCard] {
         let descriptor = FetchDescriptor<SpacedRepetitionCard>(
             sortBy: [SortDescriptor(\.timestamp)]
         )
@@ -118,7 +133,8 @@ final class SpacedRepetitionService {
             let filteredCards = allCards.filter { card in
                 let isLearning = card.isLearning
                 let matchesDocument = document == nil || card.document?.id == document?.id
-                return isLearning && matchesDocument
+                let matchesRevision = sourceContentRevision == nil || card.sourceContentRevision == sourceContentRevision
+                return isLearning && matchesDocument && matchesRevision
             }
             
             return Array(filteredCards.prefix(limit))
@@ -131,15 +147,27 @@ final class SpacedRepetitionService {
     // MARK: - Review Session Management
     
     /// Starts a spaced repetition review session
-    func startReviewSession(for document: Item? = nil, includeNewCards: Bool = true) -> SpacedRepetitionSession {
+    func startReviewSession(
+        for document: Item? = nil,
+        sourceContentRevision: Int? = nil,
+        includeNewCards: Bool = true
+    ) -> SpacedRepetitionSession {
         var sessionCards: [SpacedRepetitionCard] = []
         
         // Add due cards
-        sessionCards.append(contentsOf: getDueCards(for: document, limit: 15))
+        sessionCards.append(contentsOf: getDueCards(
+            for: document,
+            sourceContentRevision: sourceContentRevision,
+            limit: 15
+        ))
         
         // Add learning cards if needed
         if includeNewCards {
-            let learningCards = getLearningCards(for: document, limit: 5)
+            let learningCards = getLearningCards(
+                for: document,
+                sourceContentRevision: sourceContentRevision,
+                limit: 5
+            )
             sessionCards.append(contentsOf: learningCards)
         }
         
@@ -173,8 +201,10 @@ final class SpacedRepetitionService {
     // MARK: - Statistics
     
     /// Gets overall statistics for spaced repetition
-    func getStatistics(for document: Item? = nil) -> SpacedRepetitionStatistics {
-        let cards = document != nil ? getAllCards(for: document!) : getAllCards()
+    func getStatistics(for document: Item? = nil, sourceContentRevision: Int? = nil) -> SpacedRepetitionStatistics {
+        let cards = document != nil
+            ? getAllCards(for: document!, sourceContentRevision: sourceContentRevision)
+            : getAllCards(sourceContentRevision: sourceContentRevision)
         
         let totalCards = cards.count
         let dueCards = cards.filter { $0.isDue }.count
@@ -198,11 +228,13 @@ final class SpacedRepetitionService {
         )
     }
     
-    private func getAllCards() -> [SpacedRepetitionCard] {
+    private func getAllCards(sourceContentRevision: Int? = nil) -> [SpacedRepetitionCard] {
         let descriptor = FetchDescriptor<SpacedRepetitionCard>()
-        
+
         do {
-            return try modelContext.fetch(descriptor)
+            let cards = try modelContext.fetch(descriptor)
+            guard let sourceContentRevision else { return cards }
+            return cards.filter { $0.sourceContentRevision == sourceContentRevision }
         } catch {
             Logger.error.error("Failed to fetch all cards: \(error)")
             return []

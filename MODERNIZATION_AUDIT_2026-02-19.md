@@ -34,16 +34,7 @@ Primary modernization risks are:
 - Recommendation:
   - Decide true baseline and supported platforms, then align README and build settings.
 
-### 3) Content edits do not invalidate all derived artifacts
-- Evidence:
-  - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Views/AddContentView.swift:295`
-  - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Views/SpacedRepetition/SpacedRepetitionView.swift:303`
-- Detail:
-  - Question arrays are reset after content changes, but historical answers/sessions/cards can remain stale.
-- Recommendation:
-  - Define explicit invalidation/versioning policy for sessions and spaced repetition cards on content mutation.
-
-### 4) Test coverage is placeholder-only
+### 3) Test coverage is placeholder-only
 - Evidence:
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuizTests/AutoQuizTests.swift:12`
 - Recommendation:
@@ -70,8 +61,7 @@ Primary modernization risks are:
 
 1. Keep iOS/macOS 26+ only, or add fallback for older OS versions?
 2. Keep macOS/visionOS targets, or narrow to iOS/iPadOS?
-3. On content edits, should analytics/repetition history be preserved, versioned, or reset?
-4. Preferred language strategy: document language vs app locale vs explicit selector?
+3. Preferred language strategy: document language vs app locale vs explicit selector?
 
 ## Sources
 

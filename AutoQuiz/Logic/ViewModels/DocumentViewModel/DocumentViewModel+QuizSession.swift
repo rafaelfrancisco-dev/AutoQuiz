@@ -48,7 +48,8 @@ extension DocumentViewModel {
             maxQuestions: settings.maxQuestions,
             isUnlimitedQuestions: settings.isUnlimitedQuestions,
             shuffleQuestions: settings.shuffleQuestions,
-            includeFailedQuestions: settings.includeFailedQuestions
+            includeFailedQuestions: settings.includeFailedQuestions,
+            sourceContentRevision: item.contentRevision
         )
         
         // Add to model context
@@ -107,7 +108,9 @@ extension DocumentViewModel {
     }
     
     private func getFailedQuestionsFromHistory() -> [QuizQuestion] {
-        let failedAnswers = item.answeredQuestions.filter { !$0.isCorrect }
+        let failedAnswers = item.answeredQuestions.filter {
+            !$0.isCorrect && $0.sourceContentRevision == item.contentRevision
+        }
         var failedQuestions: [QuizQuestion] = []
         
         for failedAnswer in failedAnswers {

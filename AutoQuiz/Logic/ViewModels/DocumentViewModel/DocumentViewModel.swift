@@ -35,7 +35,7 @@ final class DocumentViewModel {
     
     // MARK: - Internal State (accessed by extensions)
     internal var currentSessionAnswers: Set<Int> = []
-    internal var currentSessionAnsweredQuestions: [AnsweredQuestionV1] = []
+    internal var currentSessionAnsweredQuestions: [AnsweredQuestion] = []
     internal var currentSessionQuestions: [QuizQuestion] = []
     internal var currentQuizSession: QuizSession?
     internal var currentQuestionStartedAt: Date?

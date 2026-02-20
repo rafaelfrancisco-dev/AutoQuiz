@@ -19,8 +19,16 @@ final class AnalyticsService {
     
     // MARK: - Overview Analytics
     
-    func getPerformanceOverview(for timeRange: TimeRange, document: Item? = nil) -> PerformanceOverview {
-        let sessions = getSessions(for: timeRange, document: document)
+    func getPerformanceOverview(
+        for timeRange: TimeRange,
+        document: Item? = nil,
+        sourceContentRevision: Int? = nil
+    ) -> PerformanceOverview {
+        let sessions = getSessions(
+            for: timeRange,
+            document: document,
+            sourceContentRevision: sourceContentRevision
+        )
         
         guard !sessions.isEmpty else { return .empty }
         
@@ -49,8 +57,16 @@ final class AnalyticsService {
     
     // MARK: - Trend Analysis
     
-    func getAccuracyTrend(for timeRange: TimeRange, document: Item? = nil) -> [AccuracyTrend] {
-        let sessions = getSessions(for: timeRange, document: document)
+    func getAccuracyTrend(
+        for timeRange: TimeRange,
+        document: Item? = nil,
+        sourceContentRevision: Int? = nil
+    ) -> [AccuracyTrend] {
+        let sessions = getSessions(
+            for: timeRange,
+            document: document,
+            sourceContentRevision: sourceContentRevision
+        )
         
         // Group sessions by day
         let calendar = Calendar.current
@@ -73,8 +89,16 @@ final class AnalyticsService {
     
     // MARK: - Session Type Analysis
     
-    func getSessionTypeMetrics(for timeRange: TimeRange, document: Item? = nil) -> [SessionTypeMetrics] {
-        let sessions = getSessions(for: timeRange, document: document)
+    func getSessionTypeMetrics(
+        for timeRange: TimeRange,
+        document: Item? = nil,
+        sourceContentRevision: Int? = nil
+    ) -> [SessionTypeMetrics] {
+        let sessions = getSessions(
+            for: timeRange,
+            document: document,
+            sourceContentRevision: sourceContentRevision
+        )
         
         let groupedByType = Dictionary(grouping: sessions) { $0.questionType }
         
@@ -104,8 +128,16 @@ final class AnalyticsService {
     
     // MARK: - Learning Progress
     
-    func getLearningProgress(for timeRange: TimeRange, document: Item? = nil) -> LearningProgress {
-        let sessions = getSessions(for: timeRange, document: document)
+    func getLearningProgress(
+        for timeRange: TimeRange,
+        document: Item? = nil,
+        sourceContentRevision: Int? = nil
+    ) -> LearningProgress {
+        let sessions = getSessions(
+            for: timeRange,
+            document: document,
+            sourceContentRevision: sourceContentRevision
+        )
         let recentSessions = sessions.suffix(10) // Last 10 sessions for trend analysis
         
         let currentStreak = calculateCurrentStreak(sessions: sessions)
@@ -125,11 +157,31 @@ final class AnalyticsService {
     
     // MARK: - Time Range Metrics
     
-    func getTimeRangeMetrics(for timeRange: TimeRange, document: Item? = nil) -> TimeRangeMetrics {
-        let sessions = getSessions(for: timeRange, document: document)
-        let overview = getPerformanceOverview(for: timeRange, document: document)
-        let accuracyTrend = getAccuracyTrend(for: timeRange, document: document)
-        let sessionTypeBreakdown = getSessionTypeMetrics(for: timeRange, document: document)
+    func getTimeRangeMetrics(
+        for timeRange: TimeRange,
+        document: Item? = nil,
+        sourceContentRevision: Int? = nil
+    ) -> TimeRangeMetrics {
+        let sessions = getSessions(
+            for: timeRange,
+            document: document,
+            sourceContentRevision: sourceContentRevision
+        )
+        let overview = getPerformanceOverview(
+            for: timeRange,
+            document: document,
+            sourceContentRevision: sourceContentRevision
+        )
+        let accuracyTrend = getAccuracyTrend(
+            for: timeRange,
+            document: document,
+            sourceContentRevision: sourceContentRevision
+        )
+        let sessionTypeBreakdown = getSessionTypeMetrics(
+            for: timeRange,
+            document: document,
+            sourceContentRevision: sourceContentRevision
+        )
         
         return TimeRangeMetrics(
             timeRange: timeRange,
@@ -142,7 +194,11 @@ final class AnalyticsService {
     
     // MARK: - Private Helper Methods
     
-    private func getSessions(for timeRange: TimeRange, document: Item? = nil) -> [QuizSession] {
+    private func getSessions(
+        for timeRange: TimeRange,
+        document: Item? = nil,
+        sourceContentRevision: Int? = nil
+    ) -> [QuizSession] {
         let dateRange = timeRange.dateRange
         
         let descriptor = FetchDescriptor<QuizSession>(
@@ -154,11 +210,12 @@ final class AnalyticsService {
             
             return allSessions.filter { session in
                 let inTimeRange = session.startTime >= dateRange.start && session.startTime <= dateRange.end
-                
+                let matchesRevision = sourceContentRevision == nil || session.sourceContentRevision == sourceContentRevision
+
                 if let document = document {
-                    return inTimeRange && session.document.id == document.id
+                    return inTimeRange && matchesRevision && session.document.id == document.id
                 } else {
-                    return inTimeRange
+                    return inTimeRange && matchesRevision
                 }
             }
         } catch {

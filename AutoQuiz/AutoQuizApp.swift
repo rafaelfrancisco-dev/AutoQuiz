@@ -15,7 +15,7 @@ struct AutoQuizApp: App {
         do {
             ItemMigrationPlan.validateLatestSchemaIsCurrent()
 
-            let currentSchema = Schema(SchemaV3.models, version: SchemaV3.versionIdentifier)
+            let currentSchema = Schema(SchemaV4.models, version: SchemaV4.versionIdentifier)
             let configuration = try makeModelConfiguration(for: currentSchema)
             return try ModelContainer(
                 for: currentSchema,
