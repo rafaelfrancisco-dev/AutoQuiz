@@ -13,6 +13,7 @@ extension DocumentViewModel {
     func answeredSpacedRepetitionCard(card: SpacedRepetitionCard, quality: Int, responseTime: TimeInterval) {
         // Handle spaced repetition card reviews differently - no points system, just tracking
         let answeredQuestion = AnsweredQuestion(
+            itemID: item.id,
             questionText: card.questionText,
             userAnswer: "Quality: \(quality)", // Store quality rating as user answer
             correctAnswer: card.answerText,
@@ -35,6 +36,7 @@ extension DocumentViewModel {
         let pointsEarned = correct ? 10 : 0
         
         let answeredQuestion = AnsweredQuestion(
+            itemID: item.id,
             questionText: question.question,
             userAnswer: userAnswer,
             correctAnswer: question.anwswer,
@@ -57,6 +59,7 @@ extension DocumentViewModel {
         let pointsEarned = correct ? 10 : 0
         
         let answeredQuestion = AnsweredQuestion(
+            itemID: item.id,
             questionText: question.question,
             userAnswer: userAnswer ? "True" : "False",
             correctAnswer: question.isTrue ? "True" : "False",

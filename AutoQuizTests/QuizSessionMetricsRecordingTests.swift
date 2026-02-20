@@ -9,6 +9,7 @@ import Testing
 import Foundation
 @testable import AutoQuiz
 
+@MainActor
 struct QuizSessionMetricsRecordingTests {
     @Test
     func multipleChoiceAnswerRecordsQuizSessionMetrics() throws {

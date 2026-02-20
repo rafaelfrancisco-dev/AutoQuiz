@@ -1,18 +1,18 @@
 import Foundation
-import SwiftData
 import Testing
 @testable import AutoQuiz
 
 struct RevisionFilteringTests {
     @Test
-    func analyticsFiltersSessionsBySourceContentRevision() throws {
-        let container = try makeInMemoryContainer()
-        let context = ModelContext(container)
+    func analyticsFiltersSessionsBySourceContentRevision() async throws {
+        let (store, storeDirectory) = try await makeStore()
+        defer { try? FileManager.default.removeItem(at: storeDirectory) }
+
         let item = Item(timestamp: .now, content: "Analytics test", contentRevision: 2)
-        context.insert(item)
+        try await store.upsertItem(item)
 
         let revisionOneSession = QuizSession(
-            document: item,
+            documentID: item.id,
             questionType: .multipleChoice,
             maxQuestions: 5,
             isUnlimitedQuestions: false,
@@ -24,7 +24,7 @@ struct RevisionFilteringTests {
         revisionOneSession.questionsCorrect = 1
 
         let revisionTwoSession = QuizSession(
-            document: item,
+            documentID: item.id,
             questionType: .multipleChoice,
             maxQuestions: 5,
             isUnlimitedQuestions: false,
@@ -35,16 +35,15 @@ struct RevisionFilteringTests {
         revisionTwoSession.questionsAttempted = 1
         revisionTwoSession.questionsCorrect = 0
 
-        context.insert(revisionOneSession)
-        context.insert(revisionTwoSession)
-        try context.save()
+        try await store.upsertQuizSession(revisionOneSession)
+        try await store.upsertQuizSession(revisionTwoSession)
 
-        let service = AnalyticsService(modelContext: context)
+        let service = AnalyticsService(store: store)
 
-        let allMetrics = service.getTimeRangeMetrics(for: .allTime, document: item)
+        let allMetrics = await service.getTimeRangeMetrics(for: .allTime, document: item)
         #expect(allMetrics.sessions.count == 2)
 
-        let revisionTwoMetrics = service.getTimeRangeMetrics(
+        let revisionTwoMetrics = await service.getTimeRangeMetrics(
             for: .allTime,
             document: item,
             sourceContentRevision: 2
@@ -52,21 +51,24 @@ struct RevisionFilteringTests {
 
         #expect(revisionTwoMetrics.sessions.count == 1)
         #expect(revisionTwoMetrics.sessions.first?.sourceContentRevision == 2)
+
+        await store.close()
     }
 
     @Test
-    func spacedRepetitionServiceFiltersCardsBySourceContentRevision() throws {
-        let container = try makeInMemoryContainer()
-        let context = ModelContext(container)
+    func spacedRepetitionServiceFiltersCardsBySourceContentRevision() async throws {
+        let (store, storeDirectory) = try await makeStore()
+        defer { try? FileManager.default.removeItem(at: storeDirectory) }
+
         let item = Item(timestamp: .now, content: "Spaced repetition test", contentRevision: 2)
-        context.insert(item)
+        try await store.upsertItem(item)
 
         let revisionOneCard = SpacedRepetitionCard(
             questionText: "Q1",
             answerText: "A1",
             questionType: .multipleChoice,
             originalQuestionData: Data(),
-            document: item,
+            documentID: item.id,
             sourceContentRevision: 1
         )
         revisionOneCard.nextReviewDate = Date().addingTimeInterval(-3600)
@@ -76,24 +78,25 @@ struct RevisionFilteringTests {
             answerText: "A2",
             questionType: .multipleChoice,
             originalQuestionData: Data(),
-            document: item,
+            documentID: item.id,
             sourceContentRevision: 2
         )
         revisionTwoCard.nextReviewDate = Date().addingTimeInterval(-3600)
 
-        context.insert(revisionOneCard)
-        context.insert(revisionTwoCard)
-        try context.save()
+        try await store.upsertSpacedRepetitionCard(revisionOneCard)
+        try await store.upsertSpacedRepetitionCard(revisionTwoCard)
 
-        let service = SpacedRepetitionService(modelContext: context)
-        let revisionTwoDueCards = service.getDueCards(for: item, sourceContentRevision: 2, limit: 10)
+        let service = SpacedRepetitionService(store: store)
+        let revisionTwoDueCards = await service.getDueCards(for: item, sourceContentRevision: 2, limit: 10)
 
         #expect(revisionTwoDueCards.count == 1)
         #expect(revisionTwoDueCards.first?.sourceContentRevision == 2)
 
-        let revisionOneCards = service.getAllCards(for: item, sourceContentRevision: 1)
+        let revisionOneCards = await service.getAllCards(for: item, sourceContentRevision: 1)
         #expect(revisionOneCards.count == 1)
         #expect(revisionOneCards.first?.sourceContentRevision == 1)
+
+        await store.close()
     }
 
     @Test
@@ -114,9 +117,34 @@ struct RevisionFilteringTests {
         #expect(item.title == nil)
     }
 
-    private func makeInMemoryContainer() throws -> ModelContainer {
-        let schema = Schema(SchemaV4.models, version: SchemaV4.versionIdentifier)
-        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
-        return try ModelContainer(for: schema, configurations: configuration)
+    @Test
+    func storePersistsItemsAcrossReopen() async throws {
+        let storeDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AutoQuizTests-\(UUID().uuidString)", isDirectory: true)
+        let storeURL = storeDirectory.appendingPathComponent("autoquiz.mv2s")
+
+        let store = try await AutoQuizStore.open(at: storeURL)
+        let item = Item(timestamp: .now, content: "Persist me", contentRevision: 3)
+        item.title = "Saved"
+        try await store.upsertItem(item)
+        await store.close()
+
+        let reopened = try await AutoQuizStore.open(at: storeURL)
+        let items = await reopened.items()
+        #expect(items.count == 1)
+        #expect(items.first?.id == item.id)
+        #expect(items.first?.contentRevision == 3)
+        #expect(items.first?.title == "Saved")
+        await reopened.close()
+
+        try? FileManager.default.removeItem(at: storeDirectory)
+    }
+
+    private func makeStore() async throws -> (AutoQuizStore, URL) {
+        let storeDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AutoQuizTests-\(UUID().uuidString)", isDirectory: true)
+        let storeURL = storeDirectory.appendingPathComponent("autoquiz.mv2s")
+        let store = try await AutoQuizStore.open(at: storeURL)
+        return (store, storeDirectory)
     }
 }

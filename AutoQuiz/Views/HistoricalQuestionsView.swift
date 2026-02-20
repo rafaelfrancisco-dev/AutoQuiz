@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import SwiftData
 
 struct HistoricalQuestionsView: View {
     let item: Item
@@ -91,7 +90,7 @@ struct HistoricalQuestionsView: View {
                         .padding()
                     } else {
                         List {
-                            ForEach(sortedAnsweredQuestions, id: \.timestamp) { answeredQuestion in
+                            ForEach(sortedAnsweredQuestions, id: \.id) { answeredQuestion in
                                 HistoricalQuestionRow(answeredQuestion: answeredQuestion)
                                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                             }
@@ -117,7 +116,7 @@ struct HistoricalQuestionsView: View {
                         )
                     } else {
                         List {
-                            ForEach(sortedAnsweredQuestions, id: \.timestamp) { answeredQuestion in
+                            ForEach(sortedAnsweredQuestions, id: \.id) { answeredQuestion in
                                 HistoricalQuestionRow(answeredQuestion: answeredQuestion)
                             }
                         }
@@ -215,6 +214,7 @@ struct HistoricalQuestionRow: View {
     
     sampleItem.answeredQuestions = [
         AnsweredQuestion(
+            itemID: sampleItem.id,
             questionText: "What is the capital of France?",
             userAnswer: "Paris",
             correctAnswer: "Paris",
@@ -224,6 +224,7 @@ struct HistoricalQuestionRow: View {
             sourceContentRevision: 2
         ),
         AnsweredQuestion(
+            itemID: sampleItem.id,
             questionText: "Is the Earth flat?",
             userAnswer: "True",
             correctAnswer: "False",

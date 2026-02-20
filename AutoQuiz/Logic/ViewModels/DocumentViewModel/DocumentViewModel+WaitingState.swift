@@ -14,6 +14,7 @@ extension DocumentViewModel {
         return isWaitingForNextQuestion && isBackgroundGenerating
     }
     
+    @MainActor
     func clearWaitingStateIfNeeded() {
         // Failsafe: if we're waiting but have available questions, clear waiting state
         if isWaitingForNextQuestion && !isAtLastAvailableQuestion {
@@ -22,6 +23,7 @@ extension DocumentViewModel {
         }
     }
     
+    @MainActor
     func checkForNewQuestionsAndAutoAdvance() {
         Logger.viewModel.debug("checkForNewQuestionsAndAutoAdvance called - isWaiting: \(self.isWaitingForNextQuestion)")
         

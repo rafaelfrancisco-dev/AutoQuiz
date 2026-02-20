@@ -2,64 +2,11 @@
 //  SpacedRepetitionCard.swift
 //  AutoQuiz
 //
-//  Created by Rafael Francisco on 22/06/2025.
-//
 
 import Foundation
-import SwiftData
 
-@Model
-final class SpacedRepetitionCardV1 {
-    var timestamp: Date
-    var questionText: String
-    var answerText: String
-    var questionType: Question
-    var originalQuestionData: Data
-
-    var repetitionNumber: Int
-    var easinessFactor: Double
-    var intervalDays: Int
-    var nextReviewDate: Date
-    var isLearning: Bool
-    var consecutiveCorrectAnswers: Int
-
-    var totalReviews: Int
-    var correctReviews: Int
-    var lastReviewDate: Date?
-    var averageResponseTime: TimeInterval
-
-    var document: ItemV3?
-
-    init(
-        questionText: String,
-        answerText: String,
-        questionType: Question,
-        originalQuestionData: Data,
-        document: ItemV3? = nil
-    ) {
-        self.timestamp = Date()
-        self.questionText = questionText
-        self.answerText = answerText
-        self.questionType = questionType
-        self.originalQuestionData = originalQuestionData
-        self.document = document
-
-        self.repetitionNumber = 0
-        self.easinessFactor = 2.5
-        self.intervalDays = 1
-        self.nextReviewDate = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
-        self.isLearning = true
-        self.consecutiveCorrectAnswers = 0
-
-        self.totalReviews = 0
-        self.correctReviews = 0
-        self.lastReviewDate = nil
-        self.averageResponseTime = 0
-    }
-}
-
-@Model
-final class SpacedRepetitionCardV2 {
+final class SpacedRepetitionCard: Identifiable, Codable, Hashable {
+    var id: UUID
     var timestamp: Date
     var questionText: String
     var answerText: String
@@ -79,23 +26,25 @@ final class SpacedRepetitionCardV2 {
     var lastReviewDate: Date?
     var averageResponseTime: TimeInterval
 
-    var document: Item?
+    var documentID: UUID?
 
     init(
+        id: UUID = UUID(),
         questionText: String,
         answerText: String,
         questionType: Question,
         originalQuestionData: Data,
-        document: Item? = nil,
+        documentID: UUID? = nil,
         sourceContentRevision: Int = ContentRevisionPolicy.initialRevision
     ) {
+        self.id = id
         self.timestamp = Date()
         self.questionText = questionText
         self.answerText = answerText
         self.questionType = questionType
         self.originalQuestionData = originalQuestionData
         self.sourceContentRevision = ContentRevisionPolicy.normalized(sourceContentRevision)
-        self.document = document
+        self.documentID = documentID
 
         self.repetitionNumber = 0
         self.easinessFactor = 2.5
@@ -109,9 +58,7 @@ final class SpacedRepetitionCardV2 {
         self.lastReviewDate = nil
         self.averageResponseTime = 0
     }
-}
 
-extension SpacedRepetitionCardV2 {
     func review(quality: Int, responseTime: TimeInterval) {
         let wasCorrect = quality >= 3
 
@@ -187,6 +134,14 @@ extension SpacedRepetitionCardV2 {
         let calendar = Calendar.current
         let days = calendar.dateComponents([.day], from: Date(), to: nextReviewDate).day ?? 0
         return max(0, days)
+    }
+
+    static func == (lhs: SpacedRepetitionCard, rhs: SpacedRepetitionCard) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
 

@@ -7,7 +7,6 @@
 
 import Foundation
 import SwiftUI
-import SwiftData
 import OSLog
 
 extension DocumentViewModel {
@@ -19,6 +18,7 @@ extension DocumentViewModel {
     
     private var maxConsecutiveGenerationFailures: Int { 5 }
     
+    @MainActor
     func startBackgroundGeneration(languageMode: Generator.QuizGenerationLanguageMode? = nil) {
         backgroundGenerationTask?.cancel()
         
@@ -34,11 +34,13 @@ extension DocumentViewModel {
         resolvedGenerationLanguageMode = nil
         generationIssue = nil
         
-        backgroundGenerationTask = Task { @MainActor in
-            await generateBackgroundQuestions(languageMode: desiredLanguageMode)
+        backgroundGenerationTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.generateBackgroundQuestions(languageMode: desiredLanguageMode)
         }
     }
     
+    @MainActor
     func stopBackgroundGeneration() {
         backgroundGenerationTask?.cancel()
         backgroundGenerationTask = nil
@@ -162,7 +164,7 @@ extension DocumentViewModel {
             // Add new questions to current session if active
             addNewQuestionsToSessionIfActive(questions.count, type: .multipleChoice)
             
-            try? modelContext?.save()
+            persistItemChanges()
             return .success
         } catch let error as GeneratorError {
             Logger.error.error("Background generation error (multiple choice): \(error.userFacingMessage)")
@@ -206,7 +208,7 @@ extension DocumentViewModel {
             // Add new questions to current session if active
             addNewQuestionsToSessionIfActive(questions.count, type: .trueFalse)
             
-            try? modelContext?.save()
+            persistItemChanges()
             return .success
         } catch let error as GeneratorError {
             Logger.error.error("Background generation error (true/false): \(error.userFacingMessage)")
@@ -316,7 +318,7 @@ extension DocumentViewModel {
             item.trueFalseQuestions?.removeAll()
         }
         
-        try? modelContext?.save()
+        persistItemChanges()
         
         let fallbackMode = Generator.QuizGenerationLanguageMode.specificLanguage(language)
         activeGenerationLanguageMode = fallbackMode

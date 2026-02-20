@@ -2,11 +2,8 @@
 //  ContentView.swift
 //  AutoQuiz
 //
-//  Created by Rafael Francisco on 10/06/2025.
-//
 
 import SwiftUI
-import SwiftData
 import UniformTypeIdentifiers
 #if canImport(PDFKit)
 import PDFKit
@@ -19,15 +16,17 @@ import AppKit
 #endif
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
+    @Environment(AppStore.self) private var appStore
     @Environment(\.scenePhase) private var scenePhase
-    @Query private var items: [Item]
 
     @State private var isPickerPresented = false
-    @State private var pickedFileURL: URL?
     @State private var errorMessage: String?
     @State private var selectedItemID: Item.ID?
     @State private var appAvailabilityIssue: GeneratorError?
+
+    private var items: [Item] {
+        appStore.items
+    }
 
     var body: some View {
         Group {
@@ -65,13 +64,11 @@ struct ContentView: View {
                     }
 #if os(iOS)
                     .sheet(isPresented: $isPickerPresented) {
-#if os(iOS)
                         DocumentPicker { url in
-                            if let url = url {
+                            if let url {
                                 handlePickedFile(url: url)
                             }
                         }
-#endif
                     }
 #endif
                     .alert(isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
@@ -94,14 +91,18 @@ struct ContentView: View {
         }
         .task {
             refreshAppAvailability()
+            await appStore.refreshItems()
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .active {
                 refreshAppAvailability()
+                Task {
+                    await appStore.refreshItems()
+                }
             }
         }
     }
-    
+
     @ViewBuilder
     private func unavailableView(for issue: GeneratorError) -> some View {
         VStack(spacing: 16) {
@@ -118,7 +119,7 @@ struct ContentView: View {
         }
         .padding(24)
     }
-    
+
     private func refreshAppAvailability() {
         appAvailabilityIssue = Generator.currentAvailabilityIssue()
     }
@@ -130,11 +131,11 @@ struct ContentView: View {
 #elseif os(macOS)
     private func addItem() {
         let panel = NSOpenPanel()
-        
+
         panel.allowedContentTypes = [UTType.plainText, UTType.text, UTType.content, UTType.pdf]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        
+
         panel.begin { response in
             if response == .OK, let url = panel.url {
                 handlePickedFile(url: url)
@@ -146,8 +147,9 @@ struct ContentView: View {
     private func handlePickedFile(url: URL) {
         do {
             let content = try FileHandler.extractContent(from: url)
-            let newItem = Item(timestamp: Date(), content: content)
-            modelContext.insert(newItem)
+            Task {
+                await appStore.addItem(content: content)
+            }
         } catch let error as FileHandler.FileError {
             errorMessage = error.localizedDescription
         } catch {
@@ -159,8 +161,11 @@ struct ContentView: View {
         withAnimation {
             for index in offsets {
                 let item = items[index]
-                modelContext.delete(item)
-                
+
+                Task {
+                    await appStore.deleteItem(item)
+                }
+
                 if selectedItemID == item.id {
                     selectedItemID = nil
                 }
@@ -169,8 +174,7 @@ struct ContentView: View {
     }
 }
 
-
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+        .environment(AppStore())
 }
