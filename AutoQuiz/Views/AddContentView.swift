@@ -288,16 +288,7 @@ struct AddContentView: View {
     }
     
     private func appendContent(_ content: String) {
-        // Add separator if existing content doesn't end with newlines
-        let separator = item.content.hasSuffix("\n\n") ? "" : "\n\n"
-        item.content += separator + content
-        
-        // Clear existing questions as the content has changed
-        item.questions.removeAll()
-        item.trueFalseQuestions?.removeAll()
-        
-        // Reset title to trigger regeneration
-        item.title = nil
+        item.appendContentAndAdvanceRevision(content)
         
         // Save changes
         do {

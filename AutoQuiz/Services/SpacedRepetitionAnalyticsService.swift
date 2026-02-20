@@ -19,8 +19,16 @@ final class SpacedRepetitionAnalyticsService {
     
     // MARK: - Performance Analytics
     
-    func getSpacedRepetitionMetrics(for document: Item? = nil, timeRange: TimeRange = .allTime) -> SpacedRepetitionMetrics {
-        let cards = getCards(for: document, timeRange: timeRange)
+    func getSpacedRepetitionMetrics(
+        for document: Item? = nil,
+        timeRange: TimeRange = .allTime,
+        sourceContentRevision: Int? = nil
+    ) -> SpacedRepetitionMetrics {
+        let cards = getCards(
+            for: document,
+            timeRange: timeRange,
+            sourceContentRevision: sourceContentRevision
+        )
         
         guard !cards.isEmpty else { return .empty }
         
@@ -64,9 +72,17 @@ final class SpacedRepetitionAnalyticsService {
     
     // MARK: - Learning Progress Analytics
     
-    func getLearningProgress(for document: Item? = nil, days: Int = 30) -> [LearningProgressPoint] {
+    func getLearningProgress(
+        for document: Item? = nil,
+        days: Int = 30,
+        sourceContentRevision: Int? = nil
+    ) -> [LearningProgressPoint] {
         let timeRange: TimeRange = days <= 7 ? .thisWeek : (days <= 30 ? .thisMonth : .allTime)
-        let cards = getCards(for: document, timeRange: timeRange)
+        let cards = getCards(
+            for: document,
+            timeRange: timeRange,
+            sourceContentRevision: sourceContentRevision
+        )
         let calendar = Calendar.current
         let endDate = Date()
         let startDate = calendar.date(byAdding: .day, value: -days, to: endDate) ?? endDate
@@ -100,8 +116,8 @@ final class SpacedRepetitionAnalyticsService {
     
     // MARK: - Difficulty Analysis
     
-    func getDifficultyAnalysis(for document: Item? = nil) -> [DifficultyAnalysis] {
-        let cards = getCards(for: document)
+    func getDifficultyAnalysis(for document: Item? = nil, sourceContentRevision: Int? = nil) -> [DifficultyAnalysis] {
+        let cards = getCards(for: document, sourceContentRevision: sourceContentRevision)
         
         return DifficultyLevel.allCases.map { difficulty in
             let cardsAtLevel = cards.filter { $0.difficultyLevel == difficulty }
@@ -122,7 +138,11 @@ final class SpacedRepetitionAnalyticsService {
     
     // MARK: - Private Helper Methods
     
-    private func getCards(for document: Item? = nil, timeRange: TimeRange = .allTime) -> [SpacedRepetitionCard] {
+    private func getCards(
+        for document: Item? = nil,
+        timeRange: TimeRange = .allTime,
+        sourceContentRevision: Int? = nil
+    ) -> [SpacedRepetitionCard] {
         let descriptor = FetchDescriptor<SpacedRepetitionCard>(
             sortBy: [SortDescriptor(\.timestamp)]
         )
@@ -133,7 +153,8 @@ final class SpacedRepetitionAnalyticsService {
             return allCards.filter { card in
                 let matchesDocument = document == nil || card.document?.id == document?.id
                 let inTimeRange = timeRange == .allTime || isCardInTimeRange(card, timeRange: timeRange)
-                return matchesDocument && inTimeRange
+                let matchesRevision = sourceContentRevision == nil || card.sourceContentRevision == sourceContentRevision
+                return matchesDocument && inTimeRange && matchesRevision
             }
         } catch {
             Logger.error.error("Failed to fetch spaced repetition cards: \(error)")
@@ -238,4 +259,3 @@ struct DifficultyAnalysis {
     let averageReviews: Double
     let averageAccuracy: Double
 }
-

@@ -9,36 +9,33 @@ import Foundation
 import SwiftData
 
 @Model
-final class SpacedRepetitionCard {
+final class SpacedRepetitionCardV1 {
     var timestamp: Date
     var questionText: String
     var answerText: String
-    var questionType: Question  // Original question type (multipleChoice or trueFalse)
-    var originalQuestionData: Data  // Serialized original question for reference
-    
-    // Spaced repetition algorithm properties
+    var questionType: Question
+    var originalQuestionData: Data
+
     var repetitionNumber: Int
     var easinessFactor: Double
     var intervalDays: Int
     var nextReviewDate: Date
     var isLearning: Bool
     var consecutiveCorrectAnswers: Int
-    
-    // Performance tracking
+
     var totalReviews: Int
     var correctReviews: Int
     var lastReviewDate: Date?
     var averageResponseTime: TimeInterval
-    
-    // Relationships
-    var document: Item?
-    
+
+    var document: ItemV3?
+
     init(
         questionText: String,
         answerText: String,
         questionType: Question,
         originalQuestionData: Data,
-        document: Item? = nil
+        document: ItemV3? = nil
     ) {
         self.timestamp = Date()
         self.questionText = questionText
@@ -46,16 +43,14 @@ final class SpacedRepetitionCard {
         self.questionType = questionType
         self.originalQuestionData = originalQuestionData
         self.document = document
-        
-        // Initialize spaced repetition algorithm with defaults (SM-2 algorithm)
+
         self.repetitionNumber = 0
-        self.easinessFactor = 2.5  // Default easiness factor
-        self.intervalDays = 1      // First review after 1 day
+        self.easinessFactor = 2.5
+        self.intervalDays = 1
         self.nextReviewDate = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
-        self.isLearning = true     // Card is in learning phase
+        self.isLearning = true
         self.consecutiveCorrectAnswers = 0
-        
-        // Initialize performance tracking
+
         self.totalReviews = 0
         self.correctReviews = 0
         self.lastReviewDate = nil
@@ -63,17 +58,63 @@ final class SpacedRepetitionCard {
     }
 }
 
-// MARK: - Spaced Repetition Algorithm Extensions
+@Model
+final class SpacedRepetitionCardV2 {
+    var timestamp: Date
+    var questionText: String
+    var answerText: String
+    var questionType: Question
+    var originalQuestionData: Data
+    var sourceContentRevision: Int
 
-extension SpacedRepetitionCard {
-    /// Reviews the card and updates spaced repetition parameters based on performance
-    /// - Parameters:
-    ///   - quality: Quality of response (0-5, where 3+ is considered correct)
-    ///   - responseTime: Time taken to answer in seconds
+    var repetitionNumber: Int
+    var easinessFactor: Double
+    var intervalDays: Int
+    var nextReviewDate: Date
+    var isLearning: Bool
+    var consecutiveCorrectAnswers: Int
+
+    var totalReviews: Int
+    var correctReviews: Int
+    var lastReviewDate: Date?
+    var averageResponseTime: TimeInterval
+
+    var document: Item?
+
+    init(
+        questionText: String,
+        answerText: String,
+        questionType: Question,
+        originalQuestionData: Data,
+        document: Item? = nil,
+        sourceContentRevision: Int = ContentRevisionPolicy.initialRevision
+    ) {
+        self.timestamp = Date()
+        self.questionText = questionText
+        self.answerText = answerText
+        self.questionType = questionType
+        self.originalQuestionData = originalQuestionData
+        self.sourceContentRevision = ContentRevisionPolicy.normalized(sourceContentRevision)
+        self.document = document
+
+        self.repetitionNumber = 0
+        self.easinessFactor = 2.5
+        self.intervalDays = 1
+        self.nextReviewDate = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
+        self.isLearning = true
+        self.consecutiveCorrectAnswers = 0
+
+        self.totalReviews = 0
+        self.correctReviews = 0
+        self.lastReviewDate = nil
+        self.averageResponseTime = 0
+    }
+}
+
+extension SpacedRepetitionCardV2 {
     func review(quality: Int, responseTime: TimeInterval) {
         let wasCorrect = quality >= 3
-        
-        // Update performance tracking
+
         totalReviews += 1
         if wasCorrect {
             correctReviews += 1
@@ -81,24 +122,20 @@ extension SpacedRepetitionCard {
         } else {
             consecutiveCorrectAnswers = 0
         }
-        
+
         lastReviewDate = Date()
-        
-        // Update average response time
+
         if totalReviews == 1 {
             averageResponseTime = responseTime
         } else {
             averageResponseTime = (averageResponseTime * Double(totalReviews - 1) + responseTime) / Double(totalReviews)
         }
-        
-        // Apply SM-2 algorithm
+
         updateSpacedRepetitionParameters(quality: quality)
     }
-    
+
     private func updateSpacedRepetitionParameters(quality: Int) {
-        // SM-2 Algorithm implementation
         if quality >= 3 {
-            // Correct answer
             if repetitionNumber == 0 {
                 intervalDays = 1
             } else if repetitionNumber == 1 {
@@ -107,37 +144,31 @@ extension SpacedRepetitionCard {
                 intervalDays = Int(Double(intervalDays) * easinessFactor)
             }
             repetitionNumber += 1
-            
-            // Graduation from learning phase
+
             if isLearning && consecutiveCorrectAnswers >= 2 {
                 isLearning = false
             }
         } else {
-            // Incorrect answer - reset to learning phase
             repetitionNumber = 0
             intervalDays = 1
             isLearning = true
             consecutiveCorrectAnswers = 0
         }
-        
-        // Update easiness factor based on quality
+
         let qualityDiff = Double(5 - quality)
         let qualityComponent = qualityDiff * 0.02
         let innerComponent = 0.08 + qualityComponent
         let outerComponent = qualityDiff * innerComponent
         let newEF = easinessFactor + (0.1 - outerComponent)
-        easinessFactor = max(1.3, newEF)  // Minimum easiness factor is 1.3
-        
-        // Calculate next review date
+        easinessFactor = max(1.3, newEF)
+
         nextReviewDate = Calendar.current.date(byAdding: .day, value: intervalDays, to: Date()) ?? Date()
     }
-    
-    /// Checks if this card is due for review
+
     var isDue: Bool {
         Date() >= nextReviewDate
     }
-    
-    /// Returns the difficulty level based on easiness factor
+
     var difficultyLevel: DifficultyLevel {
         switch easinessFactor {
         case 2.5...: return .easy
@@ -146,14 +177,12 @@ extension SpacedRepetitionCard {
         default: return .veryHard
         }
     }
-    
-    /// Returns the accuracy percentage for this card
+
     var accuracyPercentage: Double {
         guard totalReviews > 0 else { return 0 }
         return (Double(correctReviews) / Double(totalReviews)) * 100
     }
-    
-    /// Returns days until next review
+
     var daysUntilNextReview: Int {
         let calendar = Calendar.current
         let days = calendar.dateComponents([.day], from: Date(), to: nextReviewDate).day ?? 0
@@ -166,7 +195,7 @@ enum DifficultyLevel: String, CaseIterable {
     case medium = "Medium"
     case hard = "Hard"
     case veryHard = "Very Hard"
-    
+
     var color: String {
         switch self {
         case .easy: return "green"

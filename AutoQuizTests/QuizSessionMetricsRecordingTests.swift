@@ -12,7 +12,7 @@ import Foundation
 struct QuizSessionMetricsRecordingTests {
     @Test
     func multipleChoiceAnswerRecordsQuizSessionMetrics() throws {
-        let item = Item(timestamp: .now, content: "Test content")
+        let item = Item(timestamp: .now, content: "Test content", contentRevision: 3)
         let question = MultipleChoiceQuestion(
             question: "What is 2 + 2?",
             options: ["1", "2", "3", "4"],
@@ -39,11 +39,13 @@ struct QuizSessionMetricsRecordingTests {
         #expect(session.totalPointsEarned == 10)
         #expect(session.questionResponses == ["What is 2 + 2?"])
         #expect(session.averageResponseTime >= 0)
+        #expect(session.sourceContentRevision == 3)
+        #expect(viewModel.currentSessionAnsweredQuestions.first?.sourceContentRevision == 3)
     }
     
     @Test
     func trueFalseAnswerRecordsQuizSessionMetrics() throws {
-        let item = Item(timestamp: .now, content: "Test content")
+        let item = Item(timestamp: .now, content: "Test content", contentRevision: 2)
         let question = TrueFalseQuestion(
             question: "Swift is a programming language.",
             isTrue: true
@@ -69,5 +71,7 @@ struct QuizSessionMetricsRecordingTests {
         #expect(session.totalPointsEarned == 0)
         #expect(session.questionResponses == ["Swift is a programming language."])
         #expect(session.averageResponseTime >= 0)
+        #expect(session.sourceContentRevision == 2)
+        #expect(viewModel.currentSessionAnsweredQuestions.first?.sourceContentRevision == 2)
     }
 }

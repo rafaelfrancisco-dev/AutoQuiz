@@ -17,7 +17,7 @@ final class AnsweredQuestionV1 {
     var isCorrect: Bool
     var pointsEarned: Int
     var questionType: Question
-    
+
     init(
         questionText: String,
         userAnswer: String,
@@ -27,12 +27,42 @@ final class AnsweredQuestionV1 {
         questionType: Question
     ) {
         self.timestamp = Date()
-        
         self.questionText = questionText
         self.userAnswer = userAnswer
         self.correctAnswer = correctAnswer
         self.isCorrect = isCorrect
         self.pointsEarned = pointsEarned
         self.questionType = questionType
+    }
+}
+
+@Model
+final class AnsweredQuestionV2 {
+    var timestamp: Date
+    var questionText: String
+    var userAnswer: String
+    var correctAnswer: String
+    var isCorrect: Bool
+    var pointsEarned: Int
+    var questionType: Question
+    var sourceContentRevision: Int
+
+    init(
+        questionText: String,
+        userAnswer: String,
+        correctAnswer: String,
+        isCorrect: Bool,
+        pointsEarned: Int,
+        questionType: Question,
+        sourceContentRevision: Int = ContentRevisionPolicy.initialRevision
+    ) {
+        self.timestamp = Date()
+        self.questionText = questionText
+        self.userAnswer = userAnswer
+        self.correctAnswer = correctAnswer
+        self.isCorrect = isCorrect
+        self.pointsEarned = pointsEarned
+        self.questionType = questionType
+        self.sourceContentRevision = ContentRevisionPolicy.normalized(sourceContentRevision)
     }
 }

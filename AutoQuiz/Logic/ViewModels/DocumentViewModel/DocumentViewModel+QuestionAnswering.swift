@@ -12,13 +12,14 @@ import OSLog
 extension DocumentViewModel {
     func answeredSpacedRepetitionCard(card: SpacedRepetitionCard, quality: Int, responseTime: TimeInterval) {
         // Handle spaced repetition card reviews differently - no points system, just tracking
-        let answeredQuestion = AnsweredQuestionV1(
+        let answeredQuestion = AnsweredQuestion(
             questionText: card.questionText,
             userAnswer: "Quality: \(quality)", // Store quality rating as user answer
             correctAnswer: card.answerText,
             isCorrect: quality >= 3, // Quality 3+ considered correct
             pointsEarned: 0, // No points for spaced repetition
-            questionType: .spacedRepetition
+            questionType: .spacedRepetition,
+            sourceContentRevision: item.contentRevision
         )
         
         recordAnswer(answeredQuestion)
@@ -33,13 +34,14 @@ extension DocumentViewModel {
     func answeredQuestion(question: MultipleChoiceQuestion, correct: Bool, userAnswer: String) {
         let pointsEarned = correct ? 10 : 0
         
-        let answeredQuestion = AnsweredQuestionV1(
+        let answeredQuestion = AnsweredQuestion(
             questionText: question.question,
             userAnswer: userAnswer,
             correctAnswer: question.anwswer,
             isCorrect: correct,
             pointsEarned: pointsEarned,
-            questionType: .multipleChoice
+            questionType: .multipleChoice,
+            sourceContentRevision: item.contentRevision
         )
         
         recordAnswer(answeredQuestion)
@@ -54,13 +56,14 @@ extension DocumentViewModel {
     func answeredTrueFalseQuestion(question: TrueFalseQuestion, correct: Bool, userAnswer: Bool) {
         let pointsEarned = correct ? 10 : 0
         
-        let answeredQuestion = AnsweredQuestionV1(
+        let answeredQuestion = AnsweredQuestion(
             questionText: question.question,
             userAnswer: userAnswer ? "True" : "False",
             correctAnswer: question.isTrue ? "True" : "False",
             isCorrect: correct,
             pointsEarned: pointsEarned,
-            questionType: .trueFalse
+            questionType: .trueFalse,
+            sourceContentRevision: item.contentRevision
         )
         
         recordAnswer(answeredQuestion)
@@ -72,7 +75,7 @@ extension DocumentViewModel {
         }
     }
     
-    private func recordAnswer(_ answeredQuestion: AnsweredQuestionV1) {
+    private func recordAnswer(_ answeredQuestion: AnsweredQuestion) {
         let responseStart = currentQuestionStartedAt ?? currentQuizSession?.startTime ?? Date()
         let responseTime = max(0, Date().timeIntervalSince(responseStart))
         

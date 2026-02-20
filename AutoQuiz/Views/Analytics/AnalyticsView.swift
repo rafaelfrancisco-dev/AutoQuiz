@@ -12,6 +12,7 @@ struct AnalyticsView: View {
     @Environment(\.modelContext) private var modelContext
     
     @State private var selectedTimeRange: TimeRange = .thisWeek
+    @State private var selectedRevisionSelection: ContentRevisionSelection = .current
     @State private var analyticsService: AnalyticsService?
     @State private var timeRangeMetrics: TimeRangeMetrics?
     @State private var isLoading = true
@@ -32,6 +33,10 @@ struct AnalyticsView: View {
                     } else if let metrics = timeRangeMetrics {
                         // Time Range Selector
                         timeRangeSelector
+                        
+                        if document != nil {
+                            versionSelector
+                        }
                         
                         // Overview Cards
                         overviewSection(metrics.overview)
@@ -67,6 +72,9 @@ struct AnalyticsView: View {
             .onChange(of: selectedTimeRange) { _, _ in
                 loadAnalytics()
             }
+            .onChange(of: selectedRevisionSelection) { _, _ in
+                loadAnalytics()
+            }
         }
     }
     
@@ -84,6 +92,22 @@ struct AnalyticsView: View {
                 }
             }
             .pickerStyle(.segmented)
+        }
+    }
+    
+    private var versionSelector: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Content Version")
+                .font(.headline)
+                .fontWeight(.semibold)
+            
+            Picker("Content Version", selection: $selectedRevisionSelection) {
+                ForEach(revisionOptions, id: \.self) { selection in
+                    Text(selection.displayName(for: document))
+                        .tag(selection)
+                }
+            }
+            .pickerStyle(.menu)
         }
     }
     
@@ -168,7 +192,11 @@ struct AnalyticsView: View {
                 .fontWeight(.semibold)
             
             if let _ = timeRangeMetrics, let analyticsService = analyticsService {
-                let progress = analyticsService.getLearningProgress(for: selectedTimeRange, document: document)
+                let progress = analyticsService.getLearningProgress(
+                    for: selectedTimeRange,
+                    document: document,
+                    sourceContentRevision: selectedSourceContentRevision
+                )
                 
                 LazyVGrid(columns: [
                     GridItem(.flexible()),
@@ -265,13 +293,33 @@ struct AnalyticsView: View {
         isLoading = true
         
         Task {
-            let metrics = analyticsService.getTimeRangeMetrics(for: selectedTimeRange, document: document)
+            let metrics = analyticsService.getTimeRangeMetrics(
+                for: selectedTimeRange,
+                document: document,
+                sourceContentRevision: selectedSourceContentRevision
+            )
             
             await MainActor.run {
                 self.timeRangeMetrics = metrics
                 self.isLoading = false
             }
         }
+    }
+    
+    private var selectedSourceContentRevision: Int? {
+        selectedRevisionSelection.resolvedRevision(for: document)
+    }
+    
+    private var revisionOptions: [ContentRevisionSelection] {
+        guard let document else {
+            return [.current]
+        }
+        
+        var options: [ContentRevisionSelection] = [.current]
+        options.append(contentsOf: document.availableContentRevisions
+            .filter { $0 != document.contentRevision }
+            .map(ContentRevisionSelection.revision))
+        return options
     }
     
     private func formatDuration(_ duration: TimeInterval) -> String {
