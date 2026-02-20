@@ -68,4 +68,15 @@ enum ItemMigrationPlan: SchemaMigrationPlan {
             Logger.database.info("Completed migration from V1 to V2")
         }
     )
+
+    static func validateLatestSchemaIsCurrent(expectedLatestSchema: any VersionedSchema.Type = SchemaV2.self) {
+        guard let latestSchema = schemas.last else {
+            preconditionFailure("Migration plan has no schemas. Expected latest schema: \(expectedLatestSchema.versionIdentifier)")
+        }
+
+        precondition(
+            ObjectIdentifier(latestSchema) == ObjectIdentifier(expectedLatestSchema),
+            "Migration plan latest schema mismatch. Expected \(expectedLatestSchema.versionIdentifier), got \(latestSchema.versionIdentifier)"
+        )
+    }
 }
