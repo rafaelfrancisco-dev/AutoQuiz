@@ -8,28 +8,13 @@ Scope: iOS/macOS SwiftUI app using SwiftData + Foundation Models; project was st
 
 Primary modernization risks are:
 
-1. SwiftData migration plan exists but is not wired into `ModelContainer` startup.
-2. Data model typo (`anwswer`) has become part of persisted contracts and should be migrated carefully.
+1. Data model typo (`anwswer`) has become part of persisted contracts and should be migrated carefully.
 
 ## Prioritized Findings
 
-## P0 (Fix First)
-
-### 1) Migration plan bypassed at runtime
-- Evidence:
-  - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/AutoQuizApp.swift:13`
-  - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Models/Schemas.swift:50`
-- Detail:
-  - `ItemMigrationPlan` is defined but app startup currently creates a container directly for model types and skips migration path.
-- Impact:
-  - Schema drift and upgrade risk when adding/changing models.
-- Recommendation:
-  - Create `ModelContainer` with explicit schema/migration plan:
-  - `migrationPlan: ItemMigrationPlan.self`
-
 ## P1 (High Value Next)
 
-### 2) `anwswer` field typo should be migrated safely
+### 1) `anwswer` field typo should be migrated safely
 - Evidence:
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Models/Questions/MultipleChoiceQuestion.swift:20`
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Services/SpacedRepetitionService.swift:31`
@@ -40,7 +25,7 @@ Primary modernization risks are:
 - Recommendation:
   - Plan schema bump with backward-compatible decode mapping, then migrate to `answer`.
 
-### 3) Platform/tooling docs and project settings are inconsistent
+### 2) Platform/tooling docs and project settings are inconsistent
 - Evidence:
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/README.md:26`
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz.xcodeproj/project.pbxproj:413`
@@ -49,7 +34,7 @@ Primary modernization risks are:
 - Recommendation:
   - Decide true baseline and supported platforms, then align README and build settings.
 
-### 4) Quiz language option is not wired into generation
+### 3) Quiz language option is not wired into generation
 - Evidence:
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Models/QuizSettings.swift:48`
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Views/QuizOptionsView.swift:188`
@@ -59,7 +44,7 @@ Primary modernization risks are:
 - Recommendation:
   - Thread quiz language setting into Generator and locale support checks.
 
-### 5) Content edits do not invalidate all derived artifacts
+### 4) Content edits do not invalidate all derived artifacts
 - Evidence:
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Views/AddContentView.swift:295`
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Views/SpacedRepetition/SpacedRepetitionView.swift:303`
@@ -68,7 +53,7 @@ Primary modernization risks are:
 - Recommendation:
   - Define explicit invalidation/versioning policy for sessions and spaced repetition cards on content mutation.
 
-### 6) Test coverage is placeholder-only
+### 5) Test coverage is placeholder-only
 - Evidence:
   - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuizTests/AutoQuizTests.swift:12`
 - Recommendation:
@@ -87,10 +72,9 @@ Primary modernization risks are:
 
 ## Recommended Implementation Order
 
-1. Wire migration plan in app startup (`AutoQuizApp` + schema sanity check).
-2. Plan and execute `anwswer` -> `answer` migration.
-3. Align project settings/README and decide platform scope.
-4. Tackle lint cleanup with an automated formatting pass + lint baseline reduction.
+1. Plan and execute `anwswer` -> `answer` migration.
+2. Align project settings/README and decide platform scope.
+3. Tackle lint cleanup with an automated formatting pass + lint baseline reduction.
 
 ## Open Decisions For Next Session
 
