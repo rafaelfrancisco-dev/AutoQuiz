@@ -180,6 +180,7 @@ extension DocumentViewModel {
             if error == .unsupportedLanguageOrLocale {
                 handleUnsupportedLanguage(for: languageMode)
                 stopBackgroundGeneration()
+                
                 return .terminalFailure(error)
             }
             
@@ -194,7 +195,9 @@ extension DocumentViewModel {
             return .terminalFailure(error)
         } catch {
             Logger.error.error("Background generation error (multiple choice): \(error)")
+            
             try? await Task.sleep(nanoseconds: 2_000_000_000)
+            
             return .retryableFailure(.generationFailed)
         }
     }
@@ -204,30 +207,35 @@ extension DocumentViewModel {
         do {
             let questions = try await generator.generateTrueFalseQuestions(languageMode: languageMode)
             guard !Task.isCancelled else { return .terminalFailure(.generationFailed) }
+            
             resolvedGenerationLanguageMode = languageMode
             
             withAnimation {
                 if item.trueFalseQuestions == nil {
                     item.trueFalseQuestions = []
                 }
+                
                 item.trueFalseQuestions?.append(contentsOf: questions)
             }
+            
             generationIssue = nil
             
             Logger.generation.info("Generated true/false questions")
             
             // Add new questions to current session if active
             addNewQuestionsToSessionIfActive(questions.count, type: .trueFalse)
-            
             persistItemChanges()
+            
             return .success
         } catch let error as GeneratorError {
             Logger.error.error("Background generation error (true/false): \(error.userFacingMessage)")
+            
             if error == .unsupportedLanguageOrLocale {
                 handleUnsupportedLanguage(for: languageMode)
                 stopBackgroundGeneration()
                 return .terminalFailure(error)
             }
+            
             if error.isRetryable {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 return .retryableFailure(error)
@@ -235,10 +243,13 @@ extension DocumentViewModel {
             
             generationIssue = error
             stopBackgroundGeneration()
+            
             return .terminalFailure(error)
         } catch {
             Logger.error.error("Background generation error (true/false): \(error)")
+            
             try? await Task.sleep(nanoseconds: 2_000_000_000)
+            
             return .retryableFailure(.generationFailed)
         }
     }
