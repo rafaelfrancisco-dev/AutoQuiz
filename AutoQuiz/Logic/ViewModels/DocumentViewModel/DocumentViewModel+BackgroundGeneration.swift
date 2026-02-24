@@ -159,27 +159,30 @@ extension DocumentViewModel {
         do {
             let questions = try await generator.generateMultipleChoiceQuestions(languageMode: languageMode)
             guard !Task.isCancelled else { return .terminalFailure(.generationFailed) }
+            
             resolvedGenerationLanguageMode = languageMode
             
             withAnimation {
                 item.questions.append(contentsOf: questions)
             }
-            generationIssue = nil
             
+            generationIssue = nil
             Logger.generation.info("Generated multiple choice questions")
             
             // Add new questions to current session if active
             addNewQuestionsToSessionIfActive(questions.count, type: .multipleChoice)
-            
             persistItemChanges()
+            
             return .success
         } catch let error as GeneratorError {
             Logger.error.error("Background generation error (multiple choice): \(error.userFacingMessage)")
+            
             if error == .unsupportedLanguageOrLocale {
                 handleUnsupportedLanguage(for: languageMode)
                 stopBackgroundGeneration()
                 return .terminalFailure(error)
             }
+            
             if error.isRetryable {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 return .retryableFailure(error)
@@ -187,6 +190,7 @@ extension DocumentViewModel {
             
             generationIssue = error
             stopBackgroundGeneration()
+            
             return .terminalFailure(error)
         } catch {
             Logger.error.error("Background generation error (multiple choice): \(error)")
