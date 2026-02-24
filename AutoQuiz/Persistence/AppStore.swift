@@ -7,12 +7,15 @@ import OSLog
 final class AppStore {
     private(set) var items: [Item] = []
     private(set) var isReady = false
+    private(set) var isBootstrapping = false
     private(set) var lastErrorMessage: String?
 
     private(set) var persistenceStore: AutoQuizStore?
 
     func bootstrap() async {
-        guard !isReady else { return }
+        guard !isReady, !isBootstrapping else { return }
+        isBootstrapping = true
+        defer { isBootstrapping = false }
 
         do {
             let store = try await AutoQuizStore.openDefault()

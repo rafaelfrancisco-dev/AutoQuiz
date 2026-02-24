@@ -30,7 +30,13 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if let appAvailabilityIssue {
+            if appStore.isBootstrapping {
+                VStack(spacing: 12) {
+                    ProgressView()
+                    Text("Loading documents...")
+                        .foregroundStyle(.secondary)
+                }
+            } else if let appAvailabilityIssue {
                 unavailableView(for: appAvailabilityIssue)
             } else {
                 NavigationSplitView {
