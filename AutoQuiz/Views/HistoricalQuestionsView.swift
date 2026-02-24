@@ -56,7 +56,7 @@ struct HistoricalQuestionsView: View {
                 
                 Spacer()
                 
-                Button("Done") {
+                Button("Close") {
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent)
@@ -99,7 +99,7 @@ struct HistoricalQuestionsView: View {
                     }
                 }
             }
-            .frame(minWidth: 600, minHeight: 400)
+            .macModalSize(.history)
         }
         #else
         NavigationStack {
@@ -127,7 +127,7 @@ struct HistoricalQuestionsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
+                    Button("Close") {
                         dismiss()
                     }
                 }

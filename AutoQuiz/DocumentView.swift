@@ -197,9 +197,7 @@ struct DocumentView: View {
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 420, minHeight: 360)
-        #endif
+        .macModalSize(.languageSelection)
         .onAppear {
             if selectedFallbackLanguageIdentifier == nil {
                 selectedFallbackLanguageIdentifier = viewModel.pendingSupportedLanguages.first?.persistedIdentifier

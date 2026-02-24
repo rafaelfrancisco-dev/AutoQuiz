@@ -24,7 +24,7 @@ struct SpacedRepetitionView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 20) {
                 if document != nil {
                     versionSelector
@@ -48,35 +48,20 @@ struct SpacedRepetitionView: View {
             .toolbar {
                 #if os(iOS)
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
+                    Button("Close") {
                         dismiss()
-                    }
-                }
-
-                if isSessionComplete {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Done") {
-                            dismiss()
-                        }
                     }
                 }
                 #else
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button("Close") {
                         dismiss()
-                    }
-                }
-
-                if isSessionComplete {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button("Done") {
-                            dismiss()
-                        }
                     }
                 }
                 #endif
             }
         }
+        .macModalSize(.dashboard)
         .onAppear {
             Task {
                 await setupService()

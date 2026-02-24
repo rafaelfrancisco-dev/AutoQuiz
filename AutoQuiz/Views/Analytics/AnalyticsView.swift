@@ -7,6 +7,7 @@ import SwiftUI
 
 struct AnalyticsView: View {
     @Environment(AppStore.self) private var appStore
+    @Environment(\.dismiss) private var dismiss
 
     @State private var selectedTimeRange: TimeRange = .thisWeek
     @State private var selectedRevisionSelection: ContentRevisionSelection = .current
@@ -22,7 +23,7 @@ struct AnalyticsView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
                     if isLoading {
@@ -57,6 +58,24 @@ struct AnalyticsView: View {
                 .padding()
             }
             .navigationTitle(document?.title ?? "Performance Analytics")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                #if os(iOS)
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+                #else
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+                #endif
+            }
             .onAppear {
                 setupAnalyticsService()
                 loadAnalytics()
@@ -72,6 +91,7 @@ struct AnalyticsView: View {
                 loadAnalytics()
             }
         }
+        .macModalSize(.dashboard)
     }
 
     private var timeRangeSelector: some View {

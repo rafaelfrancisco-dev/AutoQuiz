@@ -46,7 +46,7 @@ struct AddContentView: View {
             VStack(spacing: 0) {
                 // Header
                 HStack {
-                    Button("Cancel") {
+                    Button("Close") {
                         dismiss()
                     }
                     
@@ -77,7 +77,7 @@ struct AddContentView: View {
                     .padding(24)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(minWidth: 500, minHeight: 400)
+                .macModalSize(.form)
             }
             #else
             NavigationView {
@@ -88,7 +88,7 @@ struct AddContentView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
-                        Button("Cancel") {
+                        Button("Close") {
                             dismiss()
                         }
                     }

@@ -18,7 +18,7 @@ struct QuizOptionsView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Button("Cancel") {
+                Button("Close") {
                     dismiss()
                 }
                 
@@ -50,7 +50,7 @@ struct QuizOptionsView: View {
                 .padding(24)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(minWidth: 500, minHeight: 400)
+            .macModalSize(.form)
         }
         #else
         NavigationView {
@@ -64,7 +64,7 @@ struct QuizOptionsView: View {
             #if os(iOS)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
+                    Button("Close") {
                         dismiss()
                     }
                 }
@@ -81,7 +81,7 @@ struct QuizOptionsView: View {
             #else
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button("Close") {
                         dismiss()
                     }
                 }
