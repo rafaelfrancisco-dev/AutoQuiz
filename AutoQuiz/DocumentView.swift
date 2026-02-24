@@ -135,6 +135,11 @@ struct DocumentView: View {
         .sheet(isPresented: $viewModel.isShowingLanguageSelection) {
             fallbackLanguageSheet
         }
+        .onChange(of: viewModel.isShowingLanguageSelection) { _, isPresented in
+            if isPresented {
+                selectedFallbackLanguageIdentifier = viewModel.pendingSupportedLanguages.first?.persistedIdentifier
+            }
+        }
         .onAppear {
             viewModel.appStore = appStore
         }
@@ -192,6 +197,9 @@ struct DocumentView: View {
                 }
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 420, minHeight: 360)
+        #endif
         .onAppear {
             if selectedFallbackLanguageIdentifier == nil {
                 selectedFallbackLanguageIdentifier = viewModel.pendingSupportedLanguages.first?.persistedIdentifier

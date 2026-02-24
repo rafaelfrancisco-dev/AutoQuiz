@@ -8,6 +8,7 @@
 import Foundation
 import FoundationModels
 import NaturalLanguage
+import OSLog
 
 enum GeneratorError: Error, Equatable {
     case deviceNotEligible
@@ -140,23 +141,52 @@ final class Generator {
         
         let supportedLanguages = supportedLanguages()
         
-        func isSupported(_ language: Locale.Language) -> Bool {
-            model.supportedLanguages.contains(language)
+        func resolvedSupportedLanguage(for language: Locale.Language) -> Locale.Language? {
+            if let exactEquivalent = supportedLanguages.first(where: { $0.isEquivalent(to: language) }) {
+                return exactEquivalent
+            }
+            
+            if let exactIdentifier = supportedLanguages.first(where: {
+                $0.persistedIdentifier.caseInsensitiveCompare(language.persistedIdentifier) == .orderedSame
+            }) {
+                return exactIdentifier
+            }
+            
+            if let sameLanguageCode = supportedLanguages.first(where: {
+                $0.displayIdentifier.caseInsensitiveCompare(language.displayIdentifier) == .orderedSame
+            }) {
+                return sameLanguageCode
+            }
+            
+            return nil
         }
         
         switch mode {
         case .specificLanguage(let language):
-            return isSupported(language) ? .resolved(language) : .requiresUserSelection(supportedLanguages)
+            if let resolvedLanguage = resolvedSupportedLanguage(for: language) {
+                return .resolved(resolvedLanguage)
+            }
+            return .requiresUserSelection(supportedLanguages)
         case .appLocale(let locale):
             if model.supportsLocale(locale) {
-                return .resolved(locale.language)
+                if let resolvedLanguage = resolvedSupportedLanguage(for: locale.language) {
+                    return .resolved(resolvedLanguage)
+                }
+                
+                // Locale is supported via fallback, but we couldn't map it to an
+                // explicit supported language entry.
+                return .requiresUserSelection(supportedLanguages)
             }
             return .requiresUserSelection(supportedLanguages)
         case .detectedDocumentLanguage:
             guard let detectedLanguage = detectDocumentLanguage(in: item.content) else {
                 return .requiresUserSelection(supportedLanguages)
             }
-            return isSupported(detectedLanguage) ? .resolved(detectedLanguage) : .requiresUserSelection(supportedLanguages)
+            
+            if let resolvedLanguage = resolvedSupportedLanguage(for: detectedLanguage) {
+                return .resolved(resolvedLanguage)
+            }
+            return .requiresUserSelection(supportedLanguages)
         }
     }
     
@@ -172,6 +202,7 @@ final class Generator {
     private func detectDocumentLanguage(in content: String) -> Locale.Language? {
         let sample = String(content.prefix(maxChunkSize))
         guard !sample.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            Logger.generation.info("Detected document language: none (empty content sample)")
             return nil
         }
         
@@ -179,10 +210,15 @@ final class Generator {
         recognizer.processString(sample)
         
         guard let dominantLanguage = recognizer.dominantLanguage else {
+            Logger.generation.info("Detected document language: none (no dominant language)")
             return nil
         }
         
-        return Locale.Language(identifier: dominantLanguage.rawValue)
+        let detectedLanguage = Locale.Language(identifier: dominantLanguage.rawValue)
+        Logger.generation.info(
+            "Detected document language: \(detectedLanguage.persistedIdentifier, privacy: .public)"
+        )
+        return detectedLanguage
     }
     
     private func createSession(language: Locale.Language) throws -> LanguageModelSession {
@@ -190,11 +226,25 @@ final class Generator {
             throw issue
         }
         
-        let localeIdentifier = Locale(identifier: language.persistedIdentifier).identifier
-        let instructions = """
-        The person's locale is \(localeIdentifier).
-        You MUST respond in \(localeIdentifier).
-        """
+        let canonicalLocale = Locale(identifier: language.persistedIdentifier)
+        let canonicalLocaleIdentifier = canonicalLocale.identifier
+        
+        let hasRegion = canonicalLocaleIdentifier.contains("-") || canonicalLocaleIdentifier.contains("_")
+        
+        let englishLocale = Locale(identifier: "en_US")
+        let languageName = englishLocale.localizedString(forLanguageCode: language.displayIdentifier)
+            ?? language.persistedIdentifier
+        
+        var instructionLines: [String] = []
+        
+        // Apple's guidance: locale phrase improves quality for locale variants.
+        if hasRegion, canonicalLocaleIdentifier.lowercased() != "en_us" {
+            instructionLines.append("The person's locale is \(canonicalLocaleIdentifier).")
+        }
+        
+        instructionLines.append("You MUST respond in \(languageName).")
+        
+        let instructions = instructionLines.joined(separator: "\n")
         
         return LanguageModelSession(instructions: instructions)
     }

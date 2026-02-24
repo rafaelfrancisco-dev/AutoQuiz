@@ -30,6 +30,13 @@ extension DocumentViewModel {
         }
         
         let desiredLanguageMode = languageMode ?? defaultGenerationLanguageMode()
+        let supportedLanguages = generator.supportedLanguages()
+        let supportedLanguageIdentifiers = supportedLanguages
+            .map(\.persistedIdentifier)
+            .joined(separator: ", ")
+        Logger.generation.info(
+            "Supported model languages before generation: \(supportedLanguageIdentifiers.isEmpty ? "none" : supportedLanguageIdentifiers, privacy: .public)"
+        )
         activeGenerationLanguageMode = desiredLanguageMode
         resolvedGenerationLanguageMode = nil
         generationIssue = nil
@@ -296,14 +303,10 @@ extension DocumentViewModel {
     
     @MainActor
     func handleUnsupportedLanguage(for languageMode: Generator.QuizGenerationLanguageMode) {
-        switch generator.resolveLanguage(mode: languageMode) {
-        case .resolved:
-            break
-        case .requiresUserSelection(let supportedLanguages):
-            pendingSupportedLanguages = supportedLanguages
-            isShowingLanguageSelection = !supportedLanguages.isEmpty
-            generationIssue = supportedLanguages.isEmpty ? .unsupportedLanguageOrLocale : nil
-        }
+        let supportedLanguages = generator.supportedLanguages()
+        pendingSupportedLanguages = supportedLanguages
+        isShowingLanguageSelection = !supportedLanguages.isEmpty
+        generationIssue = supportedLanguages.isEmpty ? .unsupportedLanguageOrLocale : nil
     }
     
     @MainActor
