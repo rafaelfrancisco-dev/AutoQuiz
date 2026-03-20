@@ -12,4 +12,5 @@ enum WaxEntityType: String, Codable {
     case answeredQuestion = "answered_question"
     case quizSession = "quiz_session"
     case spacedRepetitionCard = "spaced_card"
+    case documentQuestionAnswer = "document_question_answer"
 }

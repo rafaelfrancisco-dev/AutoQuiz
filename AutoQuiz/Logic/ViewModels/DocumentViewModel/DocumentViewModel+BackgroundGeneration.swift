@@ -330,6 +330,7 @@ extension DocumentViewModel {
         isShowingLanguageSelection = false
         pendingSupportedLanguages = []
         generationIssue = nil
+        documentQuestionAnswerIssue = nil
         
         withAnimation {
             item.questions.removeAll()
@@ -342,5 +343,15 @@ extension DocumentViewModel {
         activeGenerationLanguageMode = fallbackMode
         resolvedGenerationLanguageMode = fallbackMode
         startBackgroundGeneration(languageMode: fallbackMode)
+
+        if pendingDocumentQuestionAfterFallback != nil {
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                defer {
+                    self.pendingDocumentQuestionAfterFallback = nil
+                }
+                await self.submitDocumentQuestion()
+            }
+        }
     }
 }

@@ -65,6 +65,20 @@ struct TrueFalseQuestionBatch: Codable {
     let questions: [TrueFalseQuestion]
 }
 
+@Generable(description: "A document-grounded answer to a user's question")
+struct DocumentAnswerPayload: Codable {
+    @Guide(description: "True when the provided document excerpts contain enough information to answer the question without outside knowledge.")
+    let isAnswerSupportedByDocument: Bool
+
+    @Guide(description: "A concise answer based only on the document excerpts. If the excerpts are insufficient, explain briefly that the document does not contain the answer.")
+    let answer: String
+}
+
+struct DocumentAnswerResult {
+    let answer: String
+    let responseKind: DocumentQuestionAnswer.ResponseKind
+}
+
 final class Generator {
     enum QuizGenerationLanguageMode: Equatable {
         case detectedDocumentLanguage
@@ -81,6 +95,13 @@ final class Generator {
     private let model = SystemLanguageModel.default
     
     private let maxChunkSize = 3500
+    private let maxDocumentAnswerChunkSize = 2500
+    private let maxDocumentAnswerChunkCount = 3
+    private let documentAnswerStopWords: Set<String> = [
+        "about", "after", "before", "between", "document", "does", "from", "have",
+        "into", "question", "should", "their", "there", "these", "this", "what",
+        "when", "where", "which", "while", "who", "with", "would", "your"
+    ]
     
     init(item: Item) {
         self.item = item
@@ -259,6 +280,55 @@ final class Generator {
         let chunks = content.chunked(into: maxChunkSize)
         return chunks.randomElement() ?? String(content.prefix(maxChunkSize))
     }
+
+    private func documentKeywords(for question: String) -> Set<String> {
+        Set(
+            question
+                .lowercased()
+                .components(separatedBy: CharacterSet.alphanumerics.inverted)
+                .filter {
+                    $0.count >= 3 && !documentAnswerStopWords.contains($0)
+                }
+        )
+    }
+
+    private func rankedDocumentContext(for question: String) -> String {
+        let trimmedContent = item.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedContent.count > maxChunkSize else {
+            return trimmedContent
+        }
+
+        let chunks = trimmedContent.chunked(into: maxDocumentAnswerChunkSize)
+        let keywords = documentKeywords(for: question)
+
+        let rankedChunks = chunks.enumerated().map { index, chunk in
+            let lowercaseChunk = chunk.lowercased()
+            let keywordScore = keywords.reduce(into: 0) { partialResult, keyword in
+                if lowercaseChunk.contains(keyword) {
+                    partialResult += 1
+                }
+            }
+
+            let score = keywordScore == 0 ? (index == 0 ? 1 : 0) : keywordScore + 1
+            return (index, chunk, score)
+        }
+
+        let selectedChunks = rankedChunks
+            .sorted { lhs, rhs in
+                if lhs.2 == rhs.2 {
+                    return lhs.0 < rhs.0
+                }
+                return lhs.2 > rhs.2
+            }
+            .prefix(maxDocumentAnswerChunkCount)
+            .sorted { $0.0 < $1.0 }
+
+        return selectedChunks
+            .map { index, chunk, _ in
+                "Excerpt \(index + 1):\n\(chunk.trimmingCharacters(in: .whitespacesAndNewlines))"
+            }
+            .joined(separator: "\n\n")
+    }
     
     func generateMultipleChoiceQuestions(languageMode: QuizGenerationLanguageMode) async throws -> [MultipleChoiceQuestion] {
         let language = try resolveLanguageOrThrow(mode: languageMode)
@@ -301,6 +371,40 @@ final class Generator {
                 to: "Create a title for this content with 6 words max, don't add quotes: \(textToPrompt)"
             )
             return response.content
+        } catch let error as LanguageModelSession.GenerationError {
+            throw Self.mapGenerationError(error)
+        }
+    }
+
+    func answerQuestionAboutDocument(
+        _ question: String,
+        languageMode: QuizGenerationLanguageMode
+    ) async throws -> DocumentAnswerResult {
+        let language = try resolveLanguageOrThrow(mode: languageMode)
+        let session = try createSession(language: language)
+        let documentContext = rankedDocumentContext(for: question)
+
+        do {
+            let response = try await session.respond(
+                to: """
+                Answer the user's question using only the provided document excerpts.
+                Do not use outside knowledge.
+                If the document excerpts do not contain enough information, set isAnswerSupportedByDocument to false.
+                Keep the answer concise and specific.
+
+                Question:
+                \(question)
+
+                Document excerpts:
+                \(documentContext)
+                """,
+                generating: DocumentAnswerPayload.self
+            )
+
+            return DocumentAnswerResult(
+                answer: response.content.answer.trimmingCharacters(in: .whitespacesAndNewlines),
+                responseKind: response.content.isAnswerSupportedByDocument ? .answered : .insufficientDocumentContent
+            )
         } catch let error as LanguageModelSession.GenerationError {
             throw Self.mapGenerationError(error)
         }

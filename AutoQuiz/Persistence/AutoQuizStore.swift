@@ -13,11 +13,13 @@ actor AutoQuizStore {
     private var answerFramesByID: [UUID: UInt64] = [:]
     private var sessionFramesByID: [UUID: UInt64] = [:]
     private var cardFramesByID: [UUID: UInt64] = [:]
+    private var documentQuestionAnswerFramesByID: [UUID: UInt64] = [:]
 
     private var itemsByID: [UUID: Item] = [:]
     private var answersByID: [UUID: AnsweredQuestion] = [:]
     private var sessionsByID: [UUID: QuizSession] = [:]
     private var cardsByID: [UUID: SpacedRepetitionCard] = [:]
+    private var documentQuestionAnswersByID: [UUID: DocumentQuestionAnswer] = [:]
 
     static func openDefault() async throws -> AutoQuizStore {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
@@ -95,6 +97,15 @@ actor AutoQuizStore {
         }
     }
 
+    func documentQuestionAnswers(documentID: UUID? = nil, sourceContentRevision: Int? = nil) -> [DocumentQuestionAnswer] {
+        documentQuestionAnswersByID.values.filter { questionAnswer in
+            let matchesDocument = documentID == nil || questionAnswer.documentID == documentID
+            let matchesRevision = sourceContentRevision == nil || questionAnswer.sourceContentRevision == sourceContentRevision
+            return matchesDocument && matchesRevision
+        }
+        .sorted { $0.timestamp > $1.timestamp }
+    }
+
     func upsertItem(_ item: Item) async throws {
         let previousFrame = itemFramesByID[item.id]
         let frameID = try await persist(
@@ -134,6 +145,13 @@ actor AutoQuizStore {
         let cardsToDelete = cardsByID.values.filter { $0.documentID == id }.map(\.id)
         for cardID in cardsToDelete {
             try await deleteSpacedRepetitionCard(id: cardID)
+        }
+
+        let questionAnswersToDelete = documentQuestionAnswersByID.values
+            .filter { $0.documentID == id }
+            .map(\.id)
+        for questionAnswerID in questionAnswersToDelete {
+            try await deleteDocumentQuestionAnswer(id: questionAnswerID)
         }
     }
 
@@ -207,6 +225,24 @@ actor AutoQuizStore {
         for card in cards {
             try await upsertSpacedRepetitionCard(card)
         }
+    }
+
+    func upsertDocumentQuestionAnswer(_ questionAnswer: DocumentQuestionAnswer) async throws {
+        let previousFrame = documentQuestionAnswerFramesByID[questionAnswer.id]
+        let frameID = try await persist(
+            entityType: .documentQuestionAnswer,
+            entityID: questionAnswer.id,
+            object: questionAnswer,
+            previousFrameID: previousFrame,
+            metadata: [
+                WaxMetadataKeys.itemID: questionAnswer.documentID.uuidString,
+                WaxMetadataKeys.contentRevision: String(questionAnswer.sourceContentRevision)
+            ],
+            searchText: [questionAnswer.question, questionAnswer.answer].joined(separator: "\n")
+        )
+
+        documentQuestionAnswerFramesByID[questionAnswer.id] = frameID
+        documentQuestionAnswersByID[questionAnswer.id] = questionAnswer
     }
 
     private func persist<T: Codable>(
@@ -283,6 +319,10 @@ actor AutoQuizStore {
                 let card = try decoder.decode(SpacedRepetitionCard.self, from: envelope.payload)
                 cardFramesByID[entityID] = meta.id
                 cardsByID[entityID] = card
+            case .documentQuestionAnswer:
+                let questionAnswer = try decoder.decode(DocumentQuestionAnswer.self, from: envelope.payload)
+                documentQuestionAnswerFramesByID[entityID] = meta.id
+                documentQuestionAnswersByID[entityID] = questionAnswer
             }
         }
 
@@ -318,5 +358,14 @@ actor AutoQuizStore {
         try await session.commit()
         cardFramesByID.removeValue(forKey: id)
         cardsByID.removeValue(forKey: id)
+    }
+
+    private func deleteDocumentQuestionAnswer(id: UUID) async throws {
+        guard let frameID = documentQuestionAnswerFramesByID[id] else { return }
+        try await wax.delete(frameId: frameID)
+        try await session.removeText(frameId: frameID)
+        try await session.commit()
+        documentQuestionAnswerFramesByID.removeValue(forKey: id)
+        documentQuestionAnswersByID.removeValue(forKey: id)
     }
 }

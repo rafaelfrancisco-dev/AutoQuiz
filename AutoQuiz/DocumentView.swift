@@ -33,6 +33,7 @@ struct DocumentView: View {
     @State private var showingAddContent = false
     @State private var showingAnalytics = false
     @State private var showingSpacedRepetition = false
+    @State private var showingDocumentQuestions = false
     @State private var selectedFallbackLanguageIdentifier: String?
     
     init(item: Item) {
@@ -131,6 +132,9 @@ struct DocumentView: View {
         }
         .sheet(isPresented: $showingSpacedRepetition) {
             SpacedRepetitionView(document: viewModel.item)
+        }
+        .sheet(isPresented: $showingDocumentQuestions) {
+            DocumentQuestionAnsweringView(viewModel: viewModel)
         }
         .sheet(isPresented: $viewModel.isShowingLanguageSelection) {
             fallbackLanguageSheet
@@ -234,6 +238,18 @@ struct DocumentView: View {
                     .disabled(viewModel.isGenerating)
                     .controlSize(.large)
                     
+                    Button {
+                        showingDocumentQuestions = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "text.bubble")
+                            Text("Ask Document")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+
                     Button {
                         showingAnalytics = true
                     } label: {

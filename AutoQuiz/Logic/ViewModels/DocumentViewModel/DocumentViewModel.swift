@@ -7,6 +7,11 @@ import Foundation
 import SwiftUI
 import FoundationModels
 
+typealias DocumentAnswerProvider = @Sendable (
+    _ question: String,
+    _ languageMode: Generator.QuizGenerationLanguageMode
+) async throws -> DocumentAnswerResult
+
 @MainActor
 @Observable
 final class DocumentViewModel {
@@ -30,6 +35,12 @@ final class DocumentViewModel {
     var resolvedGenerationLanguageMode: Generator.QuizGenerationLanguageMode?
     var pendingSupportedLanguages: [Locale.Language] = []
     var isShowingLanguageSelection = false
+    var isSubmittingDocumentQuestion = false
+    var isLoadingDocumentQuestionAnswers = false
+    var documentQuestionInput = ""
+    var documentQuestionAnswers: [DocumentQuestionAnswer] = []
+    var selectedDocumentQuestionRevisionSelection: ContentRevisionSelection = .current
+    var documentQuestionAnswerIssue: GeneratorError?
 
     // MARK: - Internal State (accessed by extensions)
     internal var currentSessionAnswers: Set<Int> = []
@@ -42,6 +53,8 @@ final class DocumentViewModel {
     internal var lastKnownQuestionCount: (multiple: Int, trueFalse: Int) = (0, 0)
     internal var backgroundGenerationTask: Task<Void, Never>?
     internal let maxBackgroundQuestions = 3
+    internal var pendingDocumentQuestionAfterFallback: String?
+    internal let documentAnswerProvider: DocumentAnswerProvider
 
     // MARK: - Computed Properties
     var currentPoints: Int {
@@ -52,11 +65,23 @@ final class DocumentViewModel {
         generationIssue?.userFacingMessage
     }
 
+    var documentQuestionAnswerIssueMessage: String? {
+        documentQuestionAnswerIssue?.userFacingMessage
+    }
+
     // MARK: - Initialization
-    init(item: Item, appStore: AppStore? = nil) {
+    init(
+        item: Item,
+        appStore: AppStore? = nil,
+        documentAnswerProvider: DocumentAnswerProvider? = nil
+    ) {
+        let generator = Generator(item: item)
         self.item = item
-        self.generator = Generator(item: item)
+        self.generator = generator
         self.appStore = appStore
+        self.documentAnswerProvider = documentAnswerProvider ?? { question, languageMode in
+            try await generator.answerQuestionAboutDocument(question, languageMode: languageMode)
+        }
     }
 
     func persistItemChanges() {

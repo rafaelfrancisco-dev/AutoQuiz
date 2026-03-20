@@ -12,6 +12,11 @@ final class AppStore {
 
     private(set) var persistenceStore: AutoQuizStore?
 
+    init(persistenceStore: AutoQuizStore? = nil) {
+        self.persistenceStore = persistenceStore
+        self.isReady = persistenceStore != nil
+    }
+
     func bootstrap() async {
         guard !isReady, !isBootstrapping else { return }
         isBootstrapping = true
@@ -116,6 +121,17 @@ final class AppStore {
         }
     }
 
+    func saveDocumentQuestionAnswer(_ questionAnswer: DocumentQuestionAnswer) async {
+        guard let persistenceStore else { return }
+
+        do {
+            try await persistenceStore.upsertDocumentQuestionAnswer(questionAnswer)
+        } catch {
+            Logger.error.error("Failed to save document question answer: \(error.localizedDescription)")
+            self.lastErrorMessage = error.localizedDescription
+        }
+    }
+
     func quizSessions(documentID: UUID? = nil, sourceContentRevision: Int? = nil) async -> [QuizSession] {
         guard let persistenceStore else { return [] }
         return await persistenceStore.quizSessions(documentID: documentID, sourceContentRevision: sourceContentRevision)
@@ -124,5 +140,13 @@ final class AppStore {
     func spacedRepetitionCards(documentID: UUID? = nil, sourceContentRevision: Int? = nil) async -> [SpacedRepetitionCard] {
         guard let persistenceStore else { return [] }
         return await persistenceStore.spacedRepetitionCards(documentID: documentID, sourceContentRevision: sourceContentRevision)
+    }
+
+    func documentQuestionAnswers(documentID: UUID? = nil, sourceContentRevision: Int? = nil) async -> [DocumentQuestionAnswer] {
+        guard let persistenceStore else { return [] }
+        return await persistenceStore.documentQuestionAnswers(
+            documentID: documentID,
+            sourceContentRevision: sourceContentRevision
+        )
     }
 }
