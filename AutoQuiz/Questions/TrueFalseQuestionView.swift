@@ -11,69 +11,65 @@ struct TrueFalseQuestionView: View {
     let question: TrueFalseQuestion
     let onQuestionAnswered: (Bool, Bool) -> Void
     let previousAnswer: Bool?
-    
+
     @State private var selectedAnswer: Bool?
     @State private var hasAnswered = false
-    
+
     init(question: TrueFalseQuestion, previousAnswer: Bool? = nil, onQuestionAnswered: @escaping (Bool, Bool) -> Void) {
         self.question = question
         self.previousAnswer = previousAnswer
         self.onQuestionAnswered = onQuestionAnswered
-        
-        // Initialize state based on previous answer
+
         _selectedAnswer = State(initialValue: previousAnswer)
         _hasAnswered = State(initialValue: previousAnswer != nil)
     }
-    
+
     var body: some View {
-        VStack(spacing: 30) {
+        VStack(alignment: .leading, spacing: 24) {
             Text(question.question)
-                .font(.title2)
-                .multilineTextAlignment(.center)
-                .padding()
-            
-            HStack(spacing: 40) {
-                Button("True") {
-                    if !hasAnswered {
-                        selectedAnswer = true
-                        hasAnswered = true
-                        let isCorrect = question.isTrue
-                        onQuestionAnswered(isCorrect, true)
-                    }
+                .font(.title2.weight(.semibold))
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(spacing: 12) {
+                AnswerOptionButton(
+                    title: "True",
+                    subtitle: "Mark the statement as correct",
+                    style: QuestionButtonStyle.forTrueFalse(
+                        answer: true,
+                        correctAnswer: question.isTrue,
+                        selectedAnswer: selectedAnswer,
+                        hasAnswered: hasAnswered
+                    )
+                ) {
+                    selectAnswer(true)
                 }
-                .frame(width: 120, height: 50)
-                .buttonStyle(.glass)
-                .controlSize(.large)
-                .tint(buttonTintColor(for: true))
                 .disabled(hasAnswered)
-                
-                Button("False") {
-                    if !hasAnswered {
-                        selectedAnswer = false
-                        hasAnswered = true
-                        let isCorrect = !question.isTrue
-                        onQuestionAnswered(isCorrect, false)
-                    }
+
+                AnswerOptionButton(
+                    title: "False",
+                    subtitle: "Mark the statement as incorrect",
+                    style: QuestionButtonStyle.forTrueFalse(
+                        answer: false,
+                        correctAnswer: question.isTrue,
+                        selectedAnswer: selectedAnswer,
+                        hasAnswered: hasAnswered
+                    )
+                ) {
+                    selectAnswer(false)
                 }
-                .frame(width: 120, height: 50)
-                .buttonStyle(.glass)
-                .controlSize(.large)
-                .tint(buttonTintColor(for: false))
                 .disabled(hasAnswered)
             }
         }
+        .appCardStyle()
+        .accessibilityIdentifier("quiz-question-card")
     }
-    
-    private func buttonTintColor(for answer: Bool) -> Color {
-        guard hasAnswered else { return .blue }
-        
-        if answer == question.isTrue {
-            return .green
-        } else if answer == selectedAnswer {
-            return .red
-        } else {
-            return .gray
-        }
+
+    private func selectAnswer(_ answer: Bool) {
+        guard !hasAnswered else { return }
+        selectedAnswer = answer
+        hasAnswered = true
+        onQuestionAnswered(answer == question.isTrue, answer)
     }
 }
 

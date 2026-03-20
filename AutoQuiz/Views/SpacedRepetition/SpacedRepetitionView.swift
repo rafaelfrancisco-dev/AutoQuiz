@@ -18,70 +18,58 @@ struct SpacedRepetitionView: View {
     @State private var selectedRevisionSelection: ContentRevisionSelection = .current
 
     let document: Item?
+    private let previewSession: SpacedRepetitionSession?
+    private let previewIsComplete: Bool
+    private let previewStats: SessionStats?
 
-    init(document: Item? = nil) {
+    init(
+        document: Item? = nil,
+        previewSession: SpacedRepetitionSession? = nil,
+        previewIsComplete: Bool = false,
+        previewStats: SessionStats? = nil
+    ) {
         self.document = document
+        self.previewSession = previewSession
+        self.previewIsComplete = previewIsComplete
+        self.previewStats = previewStats
+        _currentSession = State(initialValue: previewSession)
+        _isSessionComplete = State(initialValue: previewIsComplete)
+        _sessionStats = State(initialValue: previewStats)
     }
 
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 20) {
+        AppModalContainer(title: "Spaced Repetition", maxWidth: 860, onDismiss: { dismiss() }) {
+            VStack(alignment: .leading, spacing: 20) {
                 if document != nil {
                     versionSelector
                 }
 
                 if let session = currentSession {
-                    if !isSessionComplete {
-                        activeSessionView(session: session)
-                    } else {
+                    if isSessionComplete {
                         sessionCompleteView
+                    } else {
+                        activeSessionView(session: session)
                     }
                 } else {
                     loadingView
                 }
             }
-            .padding()
-            .navigationTitle("Spaced Repetition")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                #if os(iOS)
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") {
-                        dismiss()
-                    }
-                }
-                #else
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        dismiss()
-                    }
-                }
-                #endif
-            }
+            .accessibilityIdentifier("spaced-repetition-screen")
         }
         .macModalSize(.dashboard)
-        .onAppear {
-            Task {
-                await setupService()
-                await startSession()
-            }
-        }
-        .task(id: appStore.isReady) {
-            await setupService()
+        .task(id: reloadID) {
+            await setupServiceIfNeeded()
             await startSession()
         }
-        .onChange(of: selectedRevisionSelection) { _, _ in
-            Task {
-                await startSession()
-            }
-        }
+    }
+
+    private var reloadID: String {
+        "\(appStore.isReady)-\(selectedRevisionSelection.displayName(for: document))"
     }
 
     @ViewBuilder
     private func activeSessionView(session: SpacedRepetitionSession) -> some View {
-        VStack(spacing: 24) {
+        VStack(alignment: .leading, spacing: 20) {
             progressView(session: session)
 
             if let currentCard = session.currentCard {
@@ -90,18 +78,35 @@ struct SpacedRepetitionView: View {
                 if showingAnswer {
                     answerSection(card: currentCard)
                 } else {
-                    showAnswerButton
+                    Button("Show Answer") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showingAnswer = true
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
+            } else {
+                AppEmptyState(
+                    title: "No Cards Ready",
+                    systemImage: "brain",
+                    description: "There are no due cards for the selected document version."
+                )
             }
         }
     }
 
     private func progressView(session: SpacedRepetitionSession) -> some View {
-        VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Card \(session.currentCardIndex + 1) of \(session.cards.count)")
-                    .font(.headline)
-                    .fontWeight(.semibold)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Card \(session.currentCardIndex + 1) of \(session.cards.count)")
+                        .font(.title3.weight(.semibold))
+                    Text("Review due items and reinforce recent learning.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
 
                 Spacer()
 
@@ -111,146 +116,94 @@ struct SpacedRepetitionView: View {
             }
 
             ProgressView(value: session.progress)
-                .progressViewStyle(LinearProgressViewStyle())
-                .frame(height: 6)
-                .scaleEffect(x: 1, y: 1.5)
+                .tint(.blue)
         }
+        .appCardStyle()
     }
 
     private func cardView(card: SpacedRepetitionCard) -> some View {
-        VStack(spacing: 16) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Image(systemName: card.questionType == .multipleChoice ? "list.bullet.circle" : "checkmark.circle")
-                    .foregroundColor(.secondary)
-
-                Text(card.questionType.displayName)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
+                AppBadge(text: card.questionType.displayName, tone: .neutral)
                 Spacer()
-
                 if card.totalReviews > 0 {
-                    Text("\(Int(card.accuracyPercentage))% accuracy")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    AppBadge(text: "\(Int(card.accuracyPercentage))% accuracy", tone: .info)
                 }
             }
 
             Text(card.questionText)
-                .font(.title2)
-                .fontWeight(.medium)
-                .multilineTextAlignment(.center)
-                .padding()
-                .frame(maxWidth: .infinity)
-                .background(Color.platformControlBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .font(.title2.weight(.semibold))
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
-    }
-
-    private var showAnswerButton: some View {
-        Button("Show Answer") {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                showingAnswer = true
-            }
-        }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .frame(maxWidth: .infinity)
+        .appCardStyle()
     }
 
     private func answerSection(card: SpacedRepetitionCard) -> some View {
-        VStack(spacing: 20) {
-            VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text("Answer")
                     .font(.headline)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
 
                 Text(card.answerText)
-                    .font(.title3)
-                    .fontWeight(.semibold)
+                    .font(.title3.weight(.semibold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
-                    .frame(maxWidth: .infinity)
-                    .background(Color.green.opacity(0.1))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.green.opacity(0.3), lineWidth: 1)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .background(AppStatusTone.success.subtleBackground, in: .rect(cornerRadius: 16))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(AppStatusTone.success.subtleBorder, lineWidth: 1)
+                    }
             }
 
-            VStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text("How well did you know this?")
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
 
-                VStack(spacing: 8) {
-                    qualityButton(title: "Perfect", subtitle: "Easy recall", quality: 5, color: .green)
-                    qualityButton(title: "Good", subtitle: "Correct with effort", quality: 4, color: .blue)
-                    qualityButton(title: "Hard", subtitle: "Difficult but correct", quality: 3, color: .orange)
-                    qualityButton(title: "Wrong", subtitle: "Incorrect answer", quality: 1, color: .red)
-                }
+                qualityButton(title: "Perfect", subtitle: "Easy recall", quality: 5, tone: .success)
+                qualityButton(title: "Good", subtitle: "Correct with effort", quality: 4, tone: .info)
+                qualityButton(title: "Hard", subtitle: "Difficult but correct", quality: 3, tone: .warning)
+                qualityButton(title: "Wrong", subtitle: "Incorrect answer", quality: 1, tone: .danger)
             }
         }
+        .appCardStyle()
     }
 
-    private func qualityButton(title: String, subtitle: String, quality: Int, color: Color) -> some View {
+    private func qualityButton(title: String, subtitle: String, quality: Int, tone: AppStatusTone) -> some View {
         Button {
             recordAnswer(quality: quality)
         } label: {
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.headline)
-                        .fontWeight(.semibold)
                     Text(subtitle)
                         .font(.caption)
-                        .opacity(0.8)
                 }
-
                 Spacer()
-
                 Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .opacity(0.6)
+                    .font(.caption.weight(.semibold))
             }
-            .padding()
-            .frame(maxWidth: .infinity)
-            .background(color.opacity(0.1))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(color.opacity(0.3), lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
-        .buttonStyle(PlainButtonStyle())
-        .foregroundColor(color)
+        .buttonStyle(QuizActionButtonStyle(tone: tone))
     }
 
     private var sessionCompleteView: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 60))
-                .foregroundColor(.green)
-
-            Text("Session Complete!")
-                .font(.title)
-                .fontWeight(.bold)
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 10) {
+                AppBadge(text: "Session Complete", tone: .success, systemImage: "checkmark.circle.fill")
+                Text("Great work. Your review session is finished.")
+                    .font(.title3.weight(.semibold))
+            }
+            .appCardStyle()
 
             if let stats = sessionStats {
-                VStack(spacing: 16) {
-                    Text("Great work! Here's how you did:")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-
-                    LazyVGrid(columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible())
-                    ], spacing: 12) {
-                        StatCard(title: "Cards Reviewed", value: "\(stats.totalCards)", color: .blue)
-                        StatCard(title: "Accuracy", value: "\(Int(stats.accuracy))%", color: .green)
-                        StatCard(title: "Average Time", value: stats.formattedAverageTime, color: .orange)
-                        StatCard(title: "Perfect Recalls", value: "\(stats.perfectRecalls)", color: .purple)
-                    }
+                AdaptiveMetricGrid {
+                    StatCard(title: "Cards Reviewed", value: "\(stats.totalCards)", tone: .info)
+                    StatCard(title: "Accuracy", value: "\(Int(stats.accuracy))%", tone: .success)
+                    StatCard(title: "Average Time", value: stats.formattedAverageTime, tone: .warning)
+                    StatCard(title: "Perfect Recalls", value: "\(stats.perfectRecalls)", tone: .neutral)
                 }
             }
 
@@ -260,24 +213,23 @@ struct SpacedRepetitionView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .controlSize(.large)
         }
-        .padding()
     }
 
     private var loadingView: some View {
         VStack(spacing: 16) {
             ProgressView()
-                .scaleEffect(1.2)
-
             Text("Preparing your review session...")
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
         }
+        .frame(maxWidth: .infinity, minHeight: 260)
     }
 
     private var versionSelector: some View {
-        HStack {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Content Version")
+                .font(.headline)
             Picker("Content Version", selection: $selectedRevisionSelection) {
                 ForEach(revisionOptions, id: \.self) { selection in
                     Text(selection.displayName(for: document))
@@ -285,18 +237,29 @@ struct SpacedRepetitionView: View {
                 }
             }
             .pickerStyle(.menu)
-
-            Spacer()
         }
+        .appCardStyle()
     }
 
-    private func setupService() async {
-        guard let store = appStore.persistenceStore else { return }
+    private func setupServiceIfNeeded() async {
+        guard previewSession == nil, let store = appStore.persistenceStore else { return }
         spacedRepetitionService = SpacedRepetitionService(store: store)
     }
 
     private func startSession() async {
-        guard let service = spacedRepetitionService else { return }
+        if let previewSession {
+            currentSession = previewSession
+            isSessionComplete = previewIsComplete
+            sessionStats = previewStats
+            showingAnswer = previewIsComplete
+            return
+        }
+
+        guard let service = spacedRepetitionService else {
+            currentSession = nil
+            return
+        }
+
         let selectedSourceContentRevision = selectedRevisionSelection.resolvedRevision(for: document)
 
         if let document {
@@ -326,7 +289,7 @@ struct SpacedRepetitionView: View {
     }
 
     private func recordAnswer(quality: Int) {
-        guard let service = spacedRepetitionService,
+        guard let service = spacedRepetitionService ?? previewServiceProxy,
               var session = currentSession,
               let currentCard = session.currentCard else { return }
 
@@ -346,6 +309,10 @@ struct SpacedRepetitionView: View {
             showingAnswer = false
             startTime = Date()
         }
+    }
+
+    private var previewServiceProxy: SpacedRepetitionService? {
+        nil
     }
 
     private func calculateSessionStats(session: SpacedRepetitionSession) {
@@ -382,46 +349,40 @@ struct SpacedRepetitionView: View {
 struct DifficultyBadge: View {
     let difficulty: DifficultyLevel
 
-    var body: some View {
-        Text(difficulty.rawValue)
-            .font(.caption2)
-            .fontWeight(.semibold)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 2)
-            .background(colorForDifficulty.opacity(0.2))
-            .foregroundColor(colorForDifficulty)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
+    private var tone: AppStatusTone {
+        switch difficulty {
+        case .easy:
+            return .success
+        case .medium:
+            return .info
+        case .hard:
+            return .warning
+        case .veryHard:
+            return .danger
+        }
     }
 
-    private var colorForDifficulty: Color {
-        switch difficulty {
-        case .easy: return .green
-        case .medium: return .yellow
-        case .hard: return .orange
-        case .veryHard: return .red
-        }
+    var body: some View {
+        AppBadge(text: difficulty.rawValue, tone: tone)
     }
 }
 
 struct StatCard: View {
     let title: String
     let value: String
-    let color: Color
+    let tone: AppStatusTone
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(value)
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(color)
-
+                .font(.title2.weight(.bold))
+                .foregroundStyle(tone.tint)
             Text(title)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
         }
-        .padding()
-        .background(Color.platformControlBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .appCardStyle()
     }
 }
 
@@ -433,7 +394,7 @@ struct SessionStats {
 
     var formattedAverageTime: String {
         if averageTime < 60 {
-            return String(format: "%.1fs", averageTime)
+            return averageTime.formatted(.number.precision(.fractionLength(1))) + "s"
         } else {
             let minutes = Int(averageTime) / 60
             let seconds = Int(averageTime) % 60
@@ -442,7 +403,27 @@ struct SessionStats {
     }
 }
 
-#Preview {
-    SpacedRepetitionView()
+#Preview("Spaced Repetition Active") {
+    let item = PreviewData.sampleItem()
+    let cards = PreviewData.sampleSpacedRepetitionCards(for: item)
+    let session = SpacedRepetitionSession(cards: cards, document: item, startTime: .now)
+
+    return SpacedRepetitionView(document: item, previewSession: session)
         .environment(AppStore())
+}
+
+#Preview("Spaced Repetition Complete") {
+    let item = PreviewData.sampleItem()
+    let cards = PreviewData.sampleSpacedRepetitionCards(for: item)
+    var session = SpacedRepetitionSession(cards: cards, document: item, startTime: .now)
+    session.moveToNextCard()
+    session.moveToNextCard()
+
+    return SpacedRepetitionView(
+        document: item,
+        previewSession: session,
+        previewIsComplete: true,
+        previewStats: SessionStats(totalCards: 2, accuracy: 100, averageTime: 3.2, perfectRecalls: 1)
+    )
+    .environment(AppStore())
 }

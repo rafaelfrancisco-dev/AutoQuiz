@@ -7,7 +7,7 @@ AutoQuiz is an intelligent SwiftUI-based application that generates interactive 
 - **AI-Powered Question Generation**: Leverages Apple's FoundationModels to create intelligent multiple choice and true/false questions
 - **Document Q&A**: Ask grounded questions about a document and save revision-aware answers per document version
 - **Multi-Format Document Support**: Import and process PDF and text documents
-- **Cross-Platform**: Native support for both macOS and iOS with platform-specific optimizations
+- **Cross-Platform**: Native support for iPhone, iPad, macOS, and visionOS with platform-appropriate navigation and modal presentation
 - **Smart Quiz Management**: Configurable quiz settings with unlimited question mode
 - **Performance Analytics**: Track your quiz performance with detailed metrics and accuracy trends
 - **Revision-Aware Persistence**: Wax-backed local storage for documents, quiz history, spaced repetition, and document Q&A
@@ -44,7 +44,7 @@ AutoQuiz is an intelligent SwiftUI-based application that generates interactive 
    open AutoQuiz.xcodeproj
    ```
 
-3. Select your target platform (macOS or iOS) and run the project
+3. Select your target platform (macOS, iPhone/iPad, or visionOS) and run the project
 
 ## Usage
 
@@ -113,12 +113,14 @@ xcodebuild -scheme AutoQuiz -configuration Release
 ### Testing
 
 ```bash
-# Run unit tests on macOS
+# Run the full macOS test suite
 xcodebuild test -scheme AutoQuiz -destination 'platform=macOS'
 
 # Run tests on iOS Simulator
 xcodebuild test -scheme AutoQuiz -destination 'platform=iOS Simulator,name=iPhone 15'
 ```
+
+UI coverage includes seeded macOS UI tests for split-view launch, document selection, and document-level modal presentation flows.
 
 ### Persistence
 
@@ -126,15 +128,19 @@ The app uses a Wax-backed local store in Application Support for documents, answ
 
 ## Platform Differences
 
-### iOS
+### iPhone and iPad
 - Uses `UIDocumentPickerViewController` for file selection
 - Touch-optimized navigation and toolbar placement
-- Mobile-specific UI adaptations
+- Adaptive layouts for compact and regular-width presentations
 
 ### macOS
 - Uses `NSOpenPanel` for native file picker experience
 - Desktop-optimized layouts with proper window management
 - Keyboard shortcuts and menu integration
+
+### visionOS
+- Uses the iOS document picker path for file import
+- Preserves native SwiftUI split-view, toolbar, and sheet behavior for windowed presentation
 
 ## Contributing
 

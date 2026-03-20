@@ -11,58 +11,51 @@ struct MultipleQuestionView: View {
     let question: MultipleChoiceQuestion
     let onQuestionAnswered: (Bool, String) -> Void
     let previousAnswer: String?
-    
+
     @State private var selectedAnswer: String?
     @State private var hasAnswered = false
-    
+
     init(question: MultipleChoiceQuestion, previousAnswer: String? = nil, onQuestionAnswered: @escaping (Bool, String) -> Void) {
         self.question = question
         self.previousAnswer = previousAnswer
         self.onQuestionAnswered = onQuestionAnswered
-        
-        // Initialize state based on previous answer
+
         _selectedAnswer = State(initialValue: previousAnswer)
         _hasAnswered = State(initialValue: previousAnswer != nil)
     }
-    
+
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(alignment: .leading, spacing: 20) {
             Text(question.question)
-                .font(.title2)
-                .multilineTextAlignment(.center)
-                .padding()
-            
+                .font(.title2.weight(.semibold))
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
             VStack(spacing: 12) {
                 ForEach(question.options, id: \.self) { option in
-                    Button(option) {
-                        if !hasAnswered {
-                            selectedAnswer = option
-                            hasAnswered = true
-                            let isCorrect = option == question.anwswer
-                            onQuestionAnswered(isCorrect, option)
-                        }
+                    let style = QuestionButtonStyle.forMultipleChoice(
+                        option: option,
+                        correctAnswer: question.anwswer,
+                        selectedAnswer: selectedAnswer,
+                        hasAnswered: hasAnswered
+                    )
+
+                    AnswerOptionButton(title: option, style: style) {
+                        selectOption(option)
                     }
-                    .frame(maxWidth: .infinity)
-                    .buttonStyle(.glass)
-                    .controlSize(.large)
-                    .tint(buttonTintColor(for: option))
                     .disabled(hasAnswered)
                 }
             }
-            .padding(.horizontal)
         }
+        .appCardStyle()
+        .accessibilityIdentifier("quiz-question-card")
     }
-    
-    private func buttonTintColor(for option: String) -> Color {
-        guard hasAnswered else { return .blue }
-        
-        if option == question.anwswer {
-            return .green
-        } else if option == selectedAnswer {
-            return .red
-        } else {
-            return .gray
-        }
+
+    private func selectOption(_ option: String) {
+        guard !hasAnswered else { return }
+        selectedAnswer = option
+        hasAnswered = true
+        onQuestionAnswered(option == question.anwswer, option)
     }
 }
 

@@ -5,143 +5,102 @@
 //  Created by Rafael Francisco on 10/06/2025.
 //
 
-import SwiftUI
 import OSLog
+import SwiftUI
+
+private enum DocumentModalDestination: String, Identifiable {
+    case quizOptions
+    case addContent
+    case history
+    case analytics
+    case spacedRepetition
+    case documentQuestions
+
+    var id: String { rawValue }
+}
+
+private enum DocumentSheetDestination: Identifiable, Equatable {
+    case modal(DocumentModalDestination)
+    case languageSelection
+
+    var id: String {
+        switch self {
+        case .modal(let destination):
+            return destination.id
+        case .languageSelection:
+            return "languageSelection"
+        }
+    }
+}
 
 struct GenerationLoadingIndicator: View {
     let message: String
     let scale: CGFloat
-    
+
     var body: some View {
-        HStack {
+        HStack(spacing: 10) {
             ProgressView()
                 .scaleEffect(scale)
-            
+
             Text(message)
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
         }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(.thinMaterial, in: .capsule)
     }
 }
 
 struct DocumentView: View {
     @Environment(AppStore.self) private var appStore
-    
+
     @State private var viewModel: DocumentViewModel
-    @State private var showingHistoricalQuestions = false
-    @State private var showingQuizOptions = false
-    @State private var showingAddContent = false
-    @State private var showingAnalytics = false
-    @State private var showingSpacedRepetition = false
-    @State private var showingDocumentQuestions = false
+    @State private var presentedSheet: DocumentSheetDestination?
     @State private var selectedFallbackLanguageIdentifier: String?
-    
+
     init(item: Item) {
-        self.viewModel = DocumentViewModel(item: item)
+        _viewModel = State(initialValue: DocumentViewModel(item: item))
     }
-    
+
+    init(viewModel: DocumentViewModel) {
+        _viewModel = State(initialValue: viewModel)
+    }
+
     var body: some View {
-        List {
-            if viewModel.hasStartedQuiz {
-                quizView
-            } else {
-                startView
+        ScrollView {
+            Group {
+                if viewModel.hasStartedQuiz {
+                    quizContent
+                } else {
+                    startContent
+                }
+            }
+            .padding()
+            .appContentWidth()
+        }
+        .background(.background)
+        .navigationTitle(viewModel.item.title ?? "Document")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                documentActionsMenu
+            }
+        }
+        .sheet(item: presentedSheetBinding) { destination in
+            switch destination {
+            case .modal(let route):
+                modalContent(for: route)
+            case .languageSelection:
+                fallbackLanguageSheet
             }
         }
         .task {
-            if viewModel.item.title == nil {
-                withAnimation {
-                    viewModel.isGenerating = true
-                }
-                
-                do {
-                    let title = try await viewModel.generator.generateTitle()
-                    
-                    withAnimation {
-                        viewModel.item.title = title
-                        viewModel.generationIssue = nil
-                    }
-                    viewModel.persistItemChanges()
-                } catch let error as GeneratorError {
-                    viewModel.generationIssue = error
-                    Logger.error.error("Failed to generate title: \(error.userFacingMessage)")
-                } catch {
-                    Logger.error.error("Failed to generate title: \(error.localizedDescription)")
-                }
-                
-                withAnimation {
-                    viewModel.isGenerating = false
-                }
-            }
-            
-            viewModel.startBackgroundGeneration()
-        }
-        .navigationTitle(viewModel.item.title ?? viewModel.item.timestamp.description)
-        #if os(macOS)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Menu {
-                    Button("Add Content") {
-                        showingAddContent = true
-                    }
-                    
-                    Divider()
-                    
-                    Button("Question History") {
-                        showingHistoricalQuestions = true
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-            }
-        }
-        #else
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    Button("Add Content") {
-                        showingAddContent = true
-                    }
-                    
-                    Divider()
-                    
-                    Button("Question History") {
-                        showingHistoricalQuestions = true
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-            }
-        }
-        #endif
-        .sheet(isPresented: $showingHistoricalQuestions) {
-            HistoricalQuestionsView(item: viewModel.item)
-        }
-        .sheet(isPresented: $showingQuizOptions) {
-            QuizOptionsView { settings in
-                withAnimation {
-                    viewModel.startQuiz(with: settings)
-                }
-            }
-        }
-        .sheet(isPresented: $showingAddContent) {
-            AddContentView(item: viewModel.item)
-        }
-        .sheet(isPresented: $showingAnalytics) {
-            AnalyticsView(document: viewModel.item)
-        }
-        .sheet(isPresented: $showingSpacedRepetition) {
-            SpacedRepetitionView(document: viewModel.item)
-        }
-        .sheet(isPresented: $showingDocumentQuestions) {
-            DocumentQuestionAnsweringView(viewModel: viewModel)
-        }
-        .sheet(isPresented: $viewModel.isShowingLanguageSelection) {
-            fallbackLanguageSheet
+            await performInitialLoad()
         }
         .onChange(of: viewModel.isShowingLanguageSelection) { _, isPresented in
             if isPresented {
                 selectedFallbackLanguageIdentifier = viewModel.pendingSupportedLanguages.first?.persistedIdentifier
+                presentedSheet = .languageSelection
             }
         }
         .onAppear {
@@ -150,19 +109,84 @@ struct DocumentView: View {
         .onDisappear {
             viewModel.stopBackgroundGeneration()
         }
-        .alert("Quiz Results", isPresented: $viewModel.showingResults) {
+        .alert("Quiz Results", isPresented: resultsBinding) {
             Button("Start New Quiz") {
                 viewModel.resetQuiz()
             }
-            
-            Button("Cancel") {
+
+            Button("Cancel", role: .cancel) {
                 viewModel.showingResults = false
             }
         } message: {
-            Text("Questions answered: \(viewModel.quizResults.totalQuestions)\nCorrect answers: \(viewModel.quizResults.correctAnswers)\nPoints earned: \(viewModel.quizResults.totalPoints)")
+            Text(
+                "Questions answered: \(viewModel.quizResults.totalQuestions)\n" +
+                "Correct answers: \(viewModel.quizResults.correctAnswers)\n" +
+                "Points earned: \(viewModel.quizResults.totalPoints)"
+            )
         }
     }
-    
+
+    private var presentedSheetBinding: Binding<DocumentSheetDestination?> {
+        Binding(
+            get: { presentedSheet },
+            set: { newValue in
+                if newValue == nil, presentedSheet == .languageSelection {
+                    viewModel.isShowingLanguageSelection = false
+                }
+                presentedSheet = newValue
+            }
+        )
+    }
+
+    private var resultsBinding: Binding<Bool> {
+        Binding(
+            get: { viewModel.showingResults },
+            set: { viewModel.showingResults = $0 }
+        )
+    }
+
+    private var documentActionsMenu: some View {
+        Menu {
+            Button("Quiz Options") {
+                present(.quizOptions)
+            }
+
+            Button("Add Content") {
+                present(.addContent)
+            }
+
+            Button("Question History") {
+                present(.history)
+            }
+        } label: {
+            Label("Document Actions", systemImage: "ellipsis.circle")
+        }
+        .accessibilityIdentifier("document-actions-menu")
+    }
+
+    @ViewBuilder
+    private func modalContent(for destination: DocumentModalDestination) -> some View {
+        switch destination {
+        case .quizOptions:
+            QuizOptionsView { settings in
+                presentedSheet = nil
+                withAnimation {
+                    viewModel.startQuiz(with: settings)
+                }
+            }
+        case .addContent:
+            AddContentView(item: viewModel.item)
+        case .history:
+            HistoricalQuestionsView(item: viewModel.item)
+        case .analytics:
+            AnalyticsView(document: viewModel.item)
+        case .spacedRepetition:
+            SpacedRepetitionView(document: viewModel.item)
+        case .documentQuestions:
+            DocumentQuestionAnsweringView(viewModel: viewModel)
+        }
+    }
+
     @ViewBuilder
     private var fallbackLanguageSheet: some View {
         NavigationStack {
@@ -190,12 +214,11 @@ struct DocumentView: View {
                         viewModel.isShowingLanguageSelection = false
                     }
                 }
-                
+
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Continue") {
                         guard let selectedFallbackLanguageIdentifier else { return }
-                        let language = Locale.Language(identifier: selectedFallbackLanguageIdentifier)
-                        viewModel.applyFallbackLanguage(language)
+                        viewModel.applyFallbackLanguage(Locale.Language(identifier: selectedFallbackLanguageIdentifier))
                     }
                     .disabled(selectedFallbackLanguageIdentifier == nil)
                 }
@@ -208,179 +231,174 @@ struct DocumentView: View {
             }
         }
     }
-    
-    private func localizedLanguageName(for language: Locale.Language) -> String {
-        let locale = Locale.current
-        let localized = locale.localizedString(forLanguageCode: language.displayIdentifier)
-        return localized ?? language.persistedIdentifier
-    }
-    
-    private var hasQuestions: Bool {
-        !viewModel.item.questions.isEmpty || !(viewModel.item.trueFalseQuestions ?? []).isEmpty
-    }
-    
-    @ViewBuilder
-    private var startView: some View {
-        VStack(spacing: 30) {
-            VStack(alignment: .leading, spacing: 20) {
-                contentDetailsView
-                
-                VStack(spacing: 12) {
-                    Button {
-                        withAnimation {
-                            showingQuizOptions = true
-                        }
-                    } label: {
-                        Text("Start Quiz")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(viewModel.isGenerating)
-                    .controlSize(.large)
-                    
-                    Button {
-                        showingDocumentQuestions = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "text.bubble")
-                            Text("Ask Document")
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
 
-                    Button {
-                        showingAnalytics = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "chart.bar")
-                            Text("View Analytics")
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                    
-                    Button {
-                        showingSpacedRepetition = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "brain.head.profile")
-                            Text("Spaced Repetition")
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
-                }
-            }
-            .padding()
-            
-            if let generationIssueMessage = viewModel.generationIssueMessage {
-                Text(generationIssueMessage)
-                    .font(.caption)
-                    .foregroundColor(.orange)
-                    .multilineTextAlignment(.center)
-            } else if !viewModel.isGenerating && !hasQuestionsForType(viewModel.selectedQuestionType) {
-                Text("Generating questions in the background...")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
+    private var startContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            DocumentSummaryCard(
+                item: viewModel.item,
+                totalQuestionCount: totalQuestionCount,
+                wordCount: wordCount,
+                isGenerating: viewModel.isGenerating
+            )
+
+            DocumentStartActions(
+                isGenerating: viewModel.isGenerating,
+                onStartQuiz: { present(.quizOptions) },
+                onAskDocument: { present(.documentQuestions) },
+                onAnalytics: { present(.analytics) },
+                onSpacedRepetition: { present(.spacedRepetition) }
+            )
+
+            statusSection
         }
+        .accessibilityIdentifier("document-start-screen")
     }
-    
+
     @ViewBuilder
-    private var quizView: some View {
-        ScrollView {
-            VStack {
-                questionProgressIndicator
-                
-                HStack {
-                    pointsDisplay
-                    
-                    Spacer()
-                    
-                    Button("End Quiz") {
-                        viewModel.endQuiz()
-                    }
-                    .buttonStyle(.bordered)
-                    .foregroundColor(.red)
-                }
-                
-                Spacer()
-                    .frame(height: 20)
-                
-                if let currentSessionQuestion = viewModel.getCurrentSessionQuestion() {
-                    switch currentSessionQuestion {
-                    case .multipleChoice(let question, _):
-                        let previousAnswer = viewModel.getPreviousAnswer(for: question)
-                        
-                        MultipleQuestionView(question: question, previousAnswer: previousAnswer) { isValid, userAnswer in
-                            viewModel.answeredQuestion(question: question, correct: isValid, userAnswer: userAnswer)
-                        }
-                        .padding()
-                        .id("multiple-\(viewModel.currentQuestionIndex)")
-                        
-                    case .trueFalse(let question, _):
-                        let previousAnswer = viewModel.getPreviousAnswer(for: question)
-                        
-                        TrueFalseQuestionView(question: question, previousAnswer: previousAnswer) { isValid, userAnswer in
-                            viewModel.answeredTrueFalseQuestion(question: question, correct: isValid, userAnswer: userAnswer)
-                        }
-                        .padding()
-                        .id("truefalse-\(viewModel.currentQuestionIndex)")
-                        
-                    case .spacedRepetition(_):
-                        // Spaced repetition should not appear in regular quiz sessions
-                        // It has its own dedicated view and workflow
-                        Text("Spaced repetition cards should not appear in regular quizzes")
-                            .foregroundColor(.red)
-                            .padding()
-                    }
-                } else {
-                    // Fallback to original logic for non-session quiz
-                    if viewModel.selectedQuestionType == .multipleChoice {
-                        if !viewModel.item.questions.isEmpty && viewModel.item.questions.indices.contains(viewModel.currentQuestionIndex) {
-                            let question = viewModel.item.questions[viewModel.currentQuestionIndex]
-                            let previousAnswer = viewModel.getPreviousAnswer(for: question)
-                            
-                            MultipleQuestionView(question: question, previousAnswer: previousAnswer) { isValid, userAnswer in
-                                viewModel.answeredQuestion(question: question, correct: isValid, userAnswer: userAnswer)
-                            }
-                            .padding()
-                            .id("multiple-\(viewModel.currentQuestionIndex)")
-                        }
-                    } else if viewModel.selectedQuestionType == .trueFalse {
-                        if !(viewModel.item.trueFalseQuestions ?? []).isEmpty && (viewModel.item.trueFalseQuestions ?? []).indices.contains(viewModel.currentQuestionIndex) {
-                            let question = viewModel.item.trueFalseQuestions![viewModel.currentQuestionIndex]
-                            let previousAnswer = viewModel.getPreviousAnswer(for: question)
-                            
-                            TrueFalseQuestionView(question: question, previousAnswer: previousAnswer) { isValid, userAnswer in
-                                viewModel.answeredTrueFalseQuestion(question: question, correct: isValid, userAnswer: userAnswer)
-                            }
-                            .padding()
-                            .id("truefalse-\(viewModel.currentQuestionIndex)")
-                        }
-                    }
-                }
-                
-                Spacer()
-                    .frame(height: 20)
-                
-                if viewModel.shouldShowWaitingIndicator {
-                    GenerationLoadingIndicator(
-                        message: "Generating next question...",
-                        scale: 0.8
-                    )
-                    .padding()
-                }
-                
-                navigationControls
-            }
+    private var statusSection: some View {
+        if let generationIssueMessage = viewModel.generationIssueMessage {
+            DocumentStatusCard(
+                title: "Generation Issue",
+                message: generationIssueMessage,
+                tone: .warning
+            )
+        } else if !viewModel.isGenerating && !hasQuestionsForType(viewModel.selectedQuestionType) {
+            DocumentStatusCard(
+                title: "Preparing Questions",
+                message: "Questions are being generated in the background. You can still add content or review analytics.",
+                tone: .info
+            )
         }
     }
-    
+
+    private var quizContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            QuizHeaderCard(
+                currentIndex: viewModel.currentQuestionIndex,
+                totalQuestions: viewModel.currentQuizSettings.isUnlimitedQuestions
+                    ? viewModel.currentSessionQuestions.count
+                    : viewModel.currentQuizSettings.maxQuestions,
+                isUnlimited: viewModel.currentQuizSettings.isUnlimitedQuestions,
+                currentPoints: viewModel.currentPoints,
+                progress: quizProgress,
+                onEndQuiz: { viewModel.endQuiz() }
+            )
+
+            currentQuestionView
+
+            if viewModel.shouldShowWaitingIndicator {
+                GenerationLoadingIndicator(
+                    message: "Generating next question...",
+                    scale: 0.8
+                )
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
+
+            QuizNavigationFooter(
+                canGoBack: viewModel.currentQuestionIndex > 0,
+                canGoForward: viewModel.canNavigateToNext,
+                onPrevious: {
+                    withAnimation {
+                        viewModel.currentQuestionIndex -= 1
+                    }
+                },
+                onNext: {
+                    withAnimation {
+                        viewModel.currentQuestionIndex += 1
+                    }
+                }
+            )
+        }
+        .accessibilityIdentifier("document-quiz-screen")
+    }
+
+    @ViewBuilder
+    private var currentQuestionView: some View {
+        if let currentSessionQuestion = viewModel.getCurrentSessionQuestion() {
+            switch currentSessionQuestion {
+            case .multipleChoice(let question, _):
+                MultipleQuestionView(
+                    question: question,
+                    previousAnswer: viewModel.getPreviousAnswer(for: question)
+                ) { isValid, userAnswer in
+                    viewModel.answeredQuestion(question: question, correct: isValid, userAnswer: userAnswer)
+                }
+                .id("multiple-\(viewModel.currentQuestionIndex)")
+            case .trueFalse(let question, _):
+                TrueFalseQuestionView(
+                    question: question,
+                    previousAnswer: viewModel.getPreviousAnswer(for: question)
+                ) { isValid, userAnswer in
+                    viewModel.answeredTrueFalseQuestion(question: question, correct: isValid, userAnswer: userAnswer)
+                }
+                .id("truefalse-\(viewModel.currentQuestionIndex)")
+            case .spacedRepetition:
+                DocumentStatusCard(
+                    title: "Unsupported Quiz State",
+                    message: "Spaced repetition cards should not appear in the standard quiz flow.",
+                    tone: .danger
+                )
+            }
+        } else {
+            DocumentStatusCard(
+                title: "No Active Question",
+                message: "This quiz is waiting for the next generated question.",
+                tone: .info
+            )
+        }
+    }
+
+    private var quizProgress: Double {
+        guard !viewModel.currentQuizSettings.isUnlimitedQuestions else {
+            guard !viewModel.currentSessionQuestions.isEmpty else { return 0 }
+            return Double(viewModel.currentQuestionIndex + 1) / Double(viewModel.currentSessionQuestions.count)
+        }
+
+        return Double(viewModel.currentQuestionIndex + 1) / Double(max(viewModel.currentQuizSettings.maxQuestions, 1))
+    }
+
+    private func performInitialLoad() async {
+        if viewModel.item.title == nil {
+            await generateTitleIfNeeded()
+        }
+
+        viewModel.startBackgroundGeneration()
+    }
+
+    private func generateTitleIfNeeded() async {
+        withAnimation {
+            viewModel.isGenerating = true
+        }
+
+        defer {
+            withAnimation {
+                viewModel.isGenerating = false
+            }
+        }
+
+        do {
+            let title = try await viewModel.generator.generateTitle()
+            withAnimation {
+                viewModel.item.title = title
+                viewModel.generationIssue = nil
+            }
+            viewModel.persistItemChanges()
+        } catch let error as GeneratorError {
+            viewModel.generationIssue = error
+            Logger.error.error("Failed to generate title: \(error.userFacingMessage)")
+        } catch {
+            Logger.error.error("Failed to generate title: \(error.localizedDescription)")
+        }
+    }
+
+    private func present(_ destination: DocumentModalDestination) {
+        presentedSheet = .modal(destination)
+    }
+
+    private func localizedLanguageName(for language: Locale.Language) -> String {
+        Locale.current.localizedString(forLanguageCode: language.displayIdentifier) ?? language.persistedIdentifier
+    }
+
     private func hasQuestionsForType(_ type: Question) -> Bool {
         switch type {
         case .multipleChoice:
@@ -388,139 +406,212 @@ struct DocumentView: View {
         case .trueFalse:
             return !(viewModel.item.trueFalseQuestions ?? []).isEmpty
         case .spacedRepetition:
-            // Spaced repetition always has questions available since it uses its own system
             return true
         }
     }
-    
-    private var pointsDisplay: some View {
-        Text("Points: \(viewModel.currentPoints)")
-            .font(.headline)
-            .foregroundColor(.primary)
-    }
-    
-    
-    private var contentDetailsView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Document Details")
-                .font(.title2)
-                .fontWeight(.semibold)
-            
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "doc.text")
-                        .foregroundColor(.secondary)
-                        .frame(width: 20)
-                    Text("Word Count:")
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text("\(wordCount)")
-                        .fontWeight(.medium)
-                }
-                
-                HStack {
-                    Image(systemName: "textformat.abc")
-                        .foregroundColor(.secondary)
-                        .frame(width: 20)
-                    Text("Character Count:")
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text("\(viewModel.item.content.count)")
-                        .fontWeight(.medium)
-                }
-                
-                HStack {
-                    Image(systemName: "questionmark.circle")
-                        .foregroundColor(.secondary)
-                        .frame(width: 20)
-                    Text("Available Questions:")
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text("\(totalQuestionCount)")
-                        .fontWeight(.medium)
-                }
-            }
-            .font(.caption)
-        }
-        .padding()
-        .background(Color.secondary.opacity(0.1))
-        .cornerRadius(8)
-    }
-    
+
     private var wordCount: Int {
         viewModel.item.content
             .components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
             .count
     }
-    
+
     private var totalQuestionCount: Int {
         viewModel.item.questions.count + (viewModel.item.trueFalseQuestions?.count ?? 0)
     }
-    
-    private var questionProgressIndicator: some View {
-        VStack(spacing: 4) {
-            HStack {
-                Text("Question \(viewModel.currentQuestionIndex + 1)")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .contentTransition(.numericText())
-                
-                if !viewModel.currentQuizSettings.isUnlimitedQuestions {
-                    Text("of \(viewModel.currentQuizSettings.maxQuestions)")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                } else if viewModel.hasStartedQuiz {
-                    Text("of \(viewModel.currentSessionQuestions.count)")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                        .contentTransition(.numericText())
-                }
-            }
-            .animation(.spring(response: 0.6, dampingFraction: 0.8), value: viewModel.currentQuestionIndex)
-            .animation(.spring(response: 0.6, dampingFraction: 0.8), value: viewModel.currentSessionQuestions.count)
-            
-            if !viewModel.currentQuizSettings.isUnlimitedQuestions {
-                ProgressView(value: Double(viewModel.currentQuestionIndex + 1), total: Double(viewModel.currentQuizSettings.maxQuestions))
-                    .progressViewStyle(LinearProgressViewStyle())
-                    .frame(height: 6)
-                    .scaleEffect(x: 1, y: 1.5)
-                    .animation(.easeInOut(duration: 0.4), value: viewModel.currentQuestionIndex)
-            }
-        }
-        .padding(.horizontal)
-        .padding(.bottom, 8)
-    }
-    
-    private var navigationControls: some View {
-        HStack {
-            Button("Previous") {
-                if viewModel.currentQuestionIndex > 0 {
-                    withAnimation {
-                        viewModel.currentQuestionIndex -= 1
-                    }
-                }
-            }
-            .disabled(viewModel.currentQuestionIndex == 0)
-            
-            Spacer()
-            
-            if viewModel.canNavigateToNext {
-                Button("Next") {
-                    withAnimation {
-                        viewModel.currentQuestionIndex += 1
-                    }
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-            }
-        }
-        .padding()
-    }
-    
 }
 
-#Preview {
-    DocumentView(item: Item(timestamp: .now, content: "Test"))
-        .environment(AppStore())
+private struct DocumentSummaryCard: View {
+    let item: Item
+    let totalQuestionCount: Int
+    let wordCount: Int
+    let isGenerating: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(item.title ?? "Untitled Document")
+                        .font(.title2.weight(.semibold))
+
+                    Text(item.timestamp, format: .dateTime.month().day().year())
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                if isGenerating {
+                    AppBadge(text: "Generating", tone: .info, systemImage: "sparkles")
+                } else {
+                    AppBadge(text: "Revision \(item.contentRevision)", tone: .neutral, systemImage: "clock.arrow.circlepath")
+                }
+            }
+
+            AdaptiveMetricGrid(minWidth: 150) {
+                metricValue("Words", value: "\(wordCount)")
+                metricValue("Characters", value: "\(item.content.count)")
+                metricValue("Questions", value: "\(totalQuestionCount)")
+                metricValue("Answered", value: "\(item.answeredQuestions.count)")
+            }
+        }
+        .appCardStyle()
+    }
+
+    private func metricValue(_ title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.title3.weight(.semibold))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct DocumentStartActions: View {
+    let isGenerating: Bool
+    let onStartQuiz: () -> Void
+    let onAskDocument: () -> Void
+    let onAnalytics: () -> Void
+    let onSpacedRepetition: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Button("Start Quiz", action: onStartQuiz)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(isGenerating)
+                .accessibilityIdentifier("open-quiz-options")
+
+            Button {
+                onAskDocument()
+            } label: {
+                Label("Ask Document", systemImage: "text.bubble")
+            }
+            .buttonStyle(QuizActionButtonStyle(tone: .info))
+            .accessibilityIdentifier("open-document-qa")
+
+            Button {
+                onAnalytics()
+            } label: {
+                Label("View Analytics", systemImage: "chart.bar")
+            }
+            .buttonStyle(QuizActionButtonStyle(tone: .success))
+            .accessibilityIdentifier("open-analytics")
+
+            Button {
+                onSpacedRepetition()
+            } label: {
+                Label("Spaced Repetition", systemImage: "brain.head.profile")
+            }
+            .buttonStyle(QuizActionButtonStyle(tone: .warning))
+            .accessibilityIdentifier("open-spaced-repetition")
+        }
+    }
+}
+
+private struct DocumentStatusCard: View {
+    let title: String
+    let message: String
+    let tone: AppStatusTone
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            AppBadge(text: title, tone: tone)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .appCardStyle()
+    }
+}
+
+private struct QuizHeaderCard: View {
+    let currentIndex: Int
+    let totalQuestions: Int
+    let isUnlimited: Bool
+    let currentPoints: Int
+    let progress: Double
+    let onEndQuiz: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Question \(currentIndex + 1)")
+                        .font(.title3.weight(.semibold))
+                    if isUnlimited {
+                        Text("\(totalQuestions) loaded so far")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("of \(totalQuestions)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                AppBadge(text: "\(currentPoints) pts", tone: .info, systemImage: "star.fill")
+            }
+
+            ProgressView(value: progress)
+                .tint(.blue)
+
+            Button("End Quiz", role: .destructive, action: onEndQuiz)
+                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .appCardStyle()
+    }
+}
+
+private struct QuizNavigationFooter: View {
+    let canGoBack: Bool
+    let canGoForward: Bool
+    let onPrevious: () -> Void
+    let onNext: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button("Previous", action: onPrevious)
+                .buttonStyle(.bordered)
+                .disabled(!canGoBack)
+
+            Spacer()
+
+            Button("Next", action: onNext)
+                .buttonStyle(.borderedProminent)
+                .disabled(!canGoForward)
+        }
+        .padding(.horizontal, 4)
+    }
+}
+
+#Preview("Document Start") {
+    NavigationStack {
+        DocumentView(item: PreviewData.sampleItem())
+            .environment(AppStore())
+    }
+}
+
+#Preview("Quiz State") {
+    let item = PreviewData.sampleItem()
+    let previewViewModel = DocumentViewModel(item: item)
+    previewViewModel.currentQuizSettings = .default
+    previewViewModel.hasStartedQuiz = true
+    previewViewModel.currentSessionQuestions = [
+        .multipleChoice(item.questions[0], originalIndex: 0)
+    ]
+    previewViewModel.currentQuestionIndex = 0
+
+    return NavigationStack {
+        DocumentView(viewModel: previewViewModel)
+            .environment(AppStore())
+    }
 }

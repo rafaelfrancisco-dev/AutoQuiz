@@ -9,9 +9,10 @@ import SwiftUI
 
 struct HistoricalQuestionsView: View {
     let item: Item
+
     @Environment(\.dismiss) private var dismiss
     @State private var selectedRevisionSelection: ContentRevisionSelection = .current
-    
+
     private var sortedAnsweredQuestions: [AnsweredQuestion] {
         item.answeredQuestions
             .filter { question in
@@ -20,11 +21,11 @@ struct HistoricalQuestionsView: View {
             }
             .sorted { $0.timestamp > $1.timestamp }
     }
-    
+
     private var selectedSourceContentRevision: Int? {
         selectedRevisionSelection.resolvedRevision(for: item)
     }
-    
+
     private var revisionOptions: [ContentRevisionSelection] {
         var options: [ContentRevisionSelection] = [.current]
         options.append(contentsOf: item.availableContentRevisions
@@ -32,208 +33,98 @@ struct HistoricalQuestionsView: View {
             .map(ContentRevisionSelection.revision))
         return options
     }
-    
-    private var versionSelector: some View {
-        Picker("Content Version", selection: $selectedRevisionSelection) {
-            ForEach(revisionOptions, id: \.self) { selection in
-                Text(selection.displayName(for: item))
-                    .tag(selection)
-            }
-        }
-        .pickerStyle(.menu)
-    }
-    
+
     var body: some View {
-        #if os(macOS)
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Spacer()
-                
-                Text("Question History")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                
-                Spacer()
-                
-                Button("Close") {
-                    dismiss()
+        AppModalContainer(title: "Question History", maxWidth: 820, onDismiss: { dismiss() }) {
+            VStack(alignment: .leading, spacing: 16) {
+                Picker("Content Version", selection: $selectedRevisionSelection) {
+                    ForEach(revisionOptions, id: \.self) { selection in
+                        Text(selection.displayName(for: item))
+                            .tag(selection)
+                    }
                 }
-                .buttonStyle(.borderedProminent)
-            }
-            .padding()
-            .background(Color(NSColor.windowBackgroundColor))
-            
-            Divider()
-            
-            // Content
-            Group {
-                VStack(alignment: .leading, spacing: 12) {
-                    versionSelector
-                    
-                    if sortedAnsweredQuestions.isEmpty {
-                        VStack(spacing: 16) {
-                            Image(systemName: "questionmark.circle")
-                                .font(.system(size: 48))
-                                .foregroundColor(.secondary)
-                            
-                            Text("No Questions Answered")
-                                .font(.title2)
-                                .fontWeight(.semibold)
-                            
-                            Text("Start a quiz to see your answered questions history here.")
-                                .font(.body)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
+                .pickerStyle(.menu)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if sortedAnsweredQuestions.isEmpty {
+                    AppEmptyState(
+                        title: "No Questions Answered",
+                        systemImage: "questionmark.circle",
+                        description: "Start a quiz to see your answered question history here."
+                    )
+                } else {
+                    LazyVStack(spacing: 12) {
+                        ForEach(sortedAnsweredQuestions, id: \.id) { answeredQuestion in
+                            HistoricalQuestionRow(answeredQuestion: answeredQuestion)
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding()
-                    } else {
-                        List {
-                            ForEach(sortedAnsweredQuestions, id: \.id) { answeredQuestion in
-                                HistoricalQuestionRow(answeredQuestion: answeredQuestion)
-                                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                            }
-                        }
-                        .listStyle(.plain)
                     }
                 }
             }
-            .macModalSize(.history)
+            .accessibilityIdentifier("question-history-screen")
         }
-        #else
-        NavigationStack {
-            VStack(spacing: 12) {
-                versionSelector
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                
-                Group {
-                    if sortedAnsweredQuestions.isEmpty {
-                        ContentUnavailableView(
-                            "No Questions Answered",
-                            systemImage: "questionmark.circle",
-                            description: Text("Start a quiz to see your answered questions history here.")
-                        )
-                    } else {
-                        List {
-                            ForEach(sortedAnsweredQuestions, id: \.id) { answeredQuestion in
-                                HistoricalQuestionRow(answeredQuestion: answeredQuestion)
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Question History")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Close") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-        #endif
+        .macModalSize(.history)
     }
 }
 
 struct HistoricalQuestionRow: View {
     let answeredQuestion: AnsweredQuestion
-    
+
+    private var resultTone: AppStatusTone {
+        answeredQuestion.isCorrect ? .success : .danger
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Image(systemName: answeredQuestion.isCorrect ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .foregroundColor(answeredQuestion.isCorrect ? .green : .red)
-                
-                Text(answeredQuestion.questionType.rawValue.capitalized)
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(Color.secondary.opacity(0.2))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                
-                Text("v\(answeredQuestion.sourceContentRevision)")
-                    .font(.caption2)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.blue.opacity(0.15))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 8) {
+                AppBadge(
+                    text: answeredQuestion.isCorrect ? "Correct" : "Incorrect",
+                    tone: resultTone,
+                    systemImage: answeredQuestion.isCorrect ? "checkmark.circle.fill" : "xmark.circle.fill"
+                )
+
+                AppBadge(text: answeredQuestion.questionType.displayName, tone: .neutral)
+                AppBadge(text: "v\(answeredQuestion.sourceContentRevision)", tone: .info)
+
                 Spacer()
-                
+
                 Text(answeredQuestion.timestamp, style: .relative)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
-            
+
             Text(answeredQuestion.questionText)
-                .font(.body)
-                .fontWeight(.medium)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("Your answer:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text(answeredQuestion.userAnswer)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(answeredQuestion.isCorrect ? .green : .red)
-                }
-                
+                .font(.headline)
+
+            VStack(alignment: .leading, spacing: 8) {
+                answerRow(title: "Your answer", value: answeredQuestion.userAnswer, tone: resultTone)
+
                 if !answeredQuestion.isCorrect {
-                    HStack {
-                        Text("Correct answer:")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text(answeredQuestion.correctAnswer)
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.green)
-                    }
+                    answerRow(title: "Correct answer", value: answeredQuestion.correctAnswer, tone: .success)
                 }
-                
-                HStack {
-                    Text("Points earned:")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Text("\(answeredQuestion.pointsEarned)")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.blue)
-                }
+
+                answerRow(title: "Points earned", value: "\(answeredQuestion.pointsEarned)", tone: .info)
             }
         }
-        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .appCardStyle()
+    }
+
+    private func answerRow(title: String, value: String, tone: AppStatusTone) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(tone.tint)
+        }
     }
 }
 
-#Preview {
-    let sampleItem = Item(timestamp: .now, content: "Sample content")
-    
-    sampleItem.answeredQuestions = [
-        AnsweredQuestion(
-            itemID: sampleItem.id,
-            questionText: "What is the capital of France?",
-            userAnswer: "Paris",
-            correctAnswer: "Paris",
-            isCorrect: true,
-            pointsEarned: 10,
-            questionType: .multipleChoice,
-            sourceContentRevision: 2
-        ),
-        AnsweredQuestion(
-            itemID: sampleItem.id,
-            questionText: "Is the Earth flat?",
-            userAnswer: "True",
-            correctAnswer: "False",
-            isCorrect: false,
-            pointsEarned: 0,
-            questionType: .trueFalse,
-            sourceContentRevision: 1
-        )
-    ]
-    
-    return HistoricalQuestionsView(item: sampleItem)
+#Preview("History Populated") {
+    HistoricalQuestionsView(item: PreviewData.sampleItem())
+}
+
+#Preview("History Empty") {
+    HistoricalQuestionsView(item: PreviewData.emptyItem())
 }

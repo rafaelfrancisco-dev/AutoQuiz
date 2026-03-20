@@ -5,7 +5,7 @@
 //  Created by Rafael Francisco on 18/06/2025.
 //
 
-#if os(iOS)
+#if os(iOS) || os(visionOS)
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers

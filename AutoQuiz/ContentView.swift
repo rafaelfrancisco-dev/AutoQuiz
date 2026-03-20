@@ -5,12 +5,6 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
-#if canImport(PDFKit)
-import PDFKit
-#endif
-#if os(iOS)
-import UIKit
-#endif
 #if os(macOS)
 import AppKit
 #endif
@@ -31,68 +25,12 @@ struct ContentView: View {
     var body: some View {
         Group {
             if appStore.isBootstrapping {
-                VStack(spacing: 12) {
-                    ProgressView()
-                    Text("Loading documents...")
-                        .foregroundStyle(.secondary)
-                }
+                ProgressView("Loading documents...")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let appAvailabilityIssue {
                 unavailableView(for: appAvailabilityIssue)
             } else {
-                NavigationSplitView {
-                    List(selection: $selectedItemID) {
-                        ForEach(items) { item in
-                            NavigationLink(value: item.id) {
-                                if let title = item.title {
-                                    Text(title)
-                                } else {
-                                    Text(item.content.prefix(40))
-                                }
-                            }
-                        }
-                        .onDelete(perform: deleteItems)
-                    }
-#if os(macOS)
-                    .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-#endif
-                    .navigationTitle("Documents")
-                    .toolbar {
-#if os(iOS)
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            EditButton()
-                        }
-#endif
-                        ToolbarItem(placement: .navigation) {
-                            Button(action: addItem) {
-                                Label("Add Item", systemImage: "plus")
-                            }
-                        }
-                    }
-#if os(iOS)
-                    .sheet(isPresented: $isPickerPresented) {
-                        DocumentPicker { url in
-                            if let url {
-                                handlePickedFile(url: url)
-                            }
-                        }
-                    }
-#endif
-                    .alert(isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
-                        Alert(
-                            title: Text("Error"),
-                            message: Text(errorMessage ?? ""),
-                            dismissButton: .default(Text("OK")) { errorMessage = nil }
-                        )
-                    }
-                } detail: {
-                    if let selID = selectedItemID,
-                       let selectedItem = items.first(where: { $0.id == selID })
-                    {
-                        DocumentView(item: selectedItem)
-                    } else {
-                        Text("Select an item")
-                    }
-                }
+                splitView
             }
         }
         .task {
@@ -107,14 +45,84 @@ struct ContentView: View {
                 }
             }
         }
+        .onChange(of: appStore.lastErrorMessage) { _, newValue in
+            if let newValue {
+                errorMessage = newValue
+            }
+        }
+        .alert("Error", isPresented: errorBinding) {
+            Button("OK") {
+                errorMessage = nil
+            }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+        #if os(iOS) || os(visionOS)
+        .sheet(isPresented: $isPickerPresented) {
+            DocumentPicker { url in
+                if let url {
+                    handlePickedFile(url: url)
+                }
+            }
+        }
+        #endif
+    }
+
+    private var splitView: some View {
+        NavigationSplitView {
+            List(selection: $selectedItemID) {
+                ForEach(items) { item in
+                    DocumentListRow(item: item)
+                        .tag(item.id)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("document-row-\(item.id.uuidString)")
+                }
+                .onDelete(perform: deleteItems)
+            }
+            .accessibilityIdentifier("document-list")
+            #if os(macOS)
+            .navigationSplitViewColumnWidth(min: 220, ideal: 260)
+            #endif
+            .navigationTitle("Documents")
+            .toolbar {
+                #if os(iOS)
+                ToolbarItem(placement: .automatic) {
+                    EditButton()
+                }
+                #endif
+
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: addItem) {
+                        Label("Add Item", systemImage: "plus")
+                    }
+                    .accessibilityIdentifier("add-item")
+                }
+            }
+        } detail: {
+            if let selectedItem {
+                DocumentView(item: selectedItem)
+            } else {
+                AppEmptyState(
+                    title: "Select a Document",
+                    systemImage: "doc.text",
+                    description: "Choose a document from the sidebar to start a quiz, review analytics, or add more content."
+                )
+                .accessibilityIdentifier("document-empty-state")
+            }
+        }
+        .accessibilityIdentifier("root-split-view")
+    }
+
+    private var selectedItem: Item? {
+        guard let selectedItemID else { return nil }
+        return items.first(where: { $0.id == selectedItemID })
     }
 
     @ViewBuilder
     private func unavailableView(for issue: GeneratorError) -> some View {
         VStack(spacing: 16) {
             Text("Apple Intelligence Required")
-                .font(.title2)
-                .bold()
+                .font(.title2.weight(.semibold))
             Text(issue.userFacingMessage)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
@@ -124,20 +132,28 @@ struct ContentView: View {
             .buttonStyle(.borderedProminent)
         }
         .padding(24)
+        .appContentWidth(560)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var errorBinding: Binding<Bool> {
+        Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )
     }
 
     private func refreshAppAvailability() {
         appAvailabilityIssue = Generator.currentAvailabilityIssue()
     }
 
-#if os(iOS)
+    #if os(iOS) || os(visionOS)
     private func addItem() {
         isPickerPresented = true
     }
-#elseif os(macOS)
+    #elseif os(macOS)
     private func addItem() {
         let panel = NSOpenPanel()
-
         panel.allowedContentTypes = [UTType.plainText, UTType.text, UTType.content, UTType.pdf]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
@@ -148,7 +164,7 @@ struct ContentView: View {
             }
         }
     }
-#endif
+    #endif
 
     private func handlePickedFile(url: URL) {
         do {
@@ -180,7 +196,32 @@ struct ContentView: View {
     }
 }
 
+private struct DocumentListRow: View {
+    let item: Item
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(item.title ?? "Untitled Document")
+                .font(.headline)
+                .lineLimit(1)
+                .accessibilityIdentifier("document-title-\(item.id.uuidString)")
+
+            Text(item.content)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+
+            HStack(spacing: 8) {
+                AppBadge(text: "\(item.questions.count + (item.trueFalseQuestions?.count ?? 0)) questions", tone: .info)
+                AppBadge(text: "v\(item.contentRevision)", tone: .neutral)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
 #Preview {
+    let previewStore = AppStore.preview(items: [PreviewData.sampleItem()])
     ContentView()
-        .environment(AppStore())
+        .environment(previewStore)
 }

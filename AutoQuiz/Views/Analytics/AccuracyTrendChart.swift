@@ -9,167 +9,138 @@ import SwiftUI
 
 struct AccuracyTrendChart: View {
     let data: [AccuracyTrend]
-    
-    private let chartHeight: CGFloat = 120
-    private let pointRadius: CGFloat = 4
-    
+
+    private let chartHeight: CGFloat = 140
+    private let pointRadius: CGFloat = 5
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text("Accuracy Over Time")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                
-                Spacer()
-                
-                if let latest = data.last {
-                    Text("\(Int(latest.accuracy))%")
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Accuracy Over Time")
                         .font(.headline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
+
+                    Text("Daily average performance for the selected range.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                if let latest = data.last {
+                    AppBadge(text: "\(Int(latest.accuracy))%", tone: tone(for: latest.accuracy))
                 }
             }
-            .padding(.horizontal)
-            
+
             if data.count >= 2 {
-                GeometryReader { geometry in
-                    let width = geometry.size.width - 32 // Account for padding
-                    let height = chartHeight
-                    
-                    ZStack {
-                        // Grid lines
-                        gridLines(width: width, height: height)
-                        
-                        // Chart line and points
-                        chartContent(width: width, height: height)
-                        
-                        // Y-axis labels
-                        yAxisLabels(height: height)
-                    }
-                    .padding(.horizontal, 16)
-                }
-                .frame(height: chartHeight + 20)
-            } else {
-                Text("Not enough data points to show trend")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                chartBody
                     .frame(height: chartHeight)
-                    .frame(maxWidth: .infinity)
-            }
-            
-            // X-axis labels (dates)
-            if data.count >= 2 {
+
                 xAxisLabels
+            } else {
+                AppEmptyState(
+                    title: "Not Enough Data",
+                    systemImage: "chart.line.uptrend.xyaxis",
+                    description: "Complete more quiz sessions to see an accuracy trend."
+                )
             }
         }
-        .padding(.vertical, 12)
+        .accessibilityElement(children: .contain)
     }
-    
+
+    private var chartBody: some View {
+        GeometryReader { geometry in
+            let plotWidth = max(geometry.size.width - 28, 1)
+            let plotHeight = geometry.size.height
+            let points = calculatePoints(width: plotWidth, height: plotHeight)
+
+            ZStack(alignment: .leading) {
+                gridLines(width: plotWidth, height: plotHeight)
+
+                Path { path in
+                    guard let firstPoint = points.first else { return }
+                    path.move(to: firstPoint)
+                    for point in points.dropFirst() {
+                        path.addLine(to: point)
+                    }
+                }
+                .stroke(
+                    LinearGradient(colors: [.blue, .green], startPoint: .leading, endPoint: .trailing),
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
+                )
+
+                ForEach(Array(points.enumerated()), id: \.offset) { index, point in
+                    Circle()
+                        .fill(tone(for: data[index].accuracy).tint)
+                        .frame(width: pointRadius * 2, height: pointRadius * 2)
+                        .position(point)
+                        .accessibilityLabel("\(Int(data[index].accuracy)) percent on \(data[index].date.formatted(date: .abbreviated, time: .omitted))")
+                }
+            }
+            .padding(.leading, 28)
+        }
+    }
+
     private func gridLines(width: CGFloat, height: CGFloat) -> some View {
-        Path { path in
-            // Horizontal grid lines (accuracy percentages)
-            for i in 0...4 {
-                let y = height - (CGFloat(i) * height / 4)
-                path.move(to: CGPoint(x: 0, y: y))
-                path.addLine(to: CGPoint(x: width, y: y))
-            }
-        }
-        .stroke(Color.secondary.opacity(0.2), lineWidth: 0.5)
-    }
-    
-    private func chartContent(width: CGFloat, height: CGFloat) -> some View {
-        ZStack {
-            // Chart line
-            chartLine(width: width, height: height)
-            
-            // Data points
-            chartPoints(width: width, height: height)
-        }
-    }
-    
-    private func chartLine(width: CGFloat, height: CGFloat) -> some View {
-        Path { path in
-            guard data.count >= 2 else { return }
-            
-            let points = calculatePoints(width: width, height: height)
-            
-            if let firstPoint = points.first {
-                path.move(to: firstPoint)
-                for point in points.dropFirst() {
-                    path.addLine(to: point)
+        ZStack(alignment: .leading) {
+            Path { path in
+                for index in 0...4 {
+                    let y = height - (CGFloat(index) * height / 4)
+                    path.move(to: CGPoint(x: 0, y: y))
+                    path.addLine(to: CGPoint(x: width, y: y))
                 }
             }
-        }
-        .stroke(
-            LinearGradient(
-                colors: [.blue, .green],
-                startPoint: .leading,
-                endPoint: .trailing
-            ),
-            style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
-        )
-    }
-    
-    private func chartPoints(width: CGFloat, height: CGFloat) -> some View {
-        let points = calculatePoints(width: width, height: height)
-        
-        return ForEach(Array(points.enumerated()), id: \.offset) { index, point in
-            Circle()
-                .fill(colorForAccuracy(data[index].accuracy))
-                .frame(width: pointRadius * 2, height: pointRadius * 2)
-                .position(point)
-        }
-    }
-    
-    private func yAxisLabels(height: CGFloat) -> some View {
-        VStack {
-            ForEach(0..<5) { i in
-                HStack {
-                    Text("\(100 - i * 25)%")
+            .stroke(Color.platformBorder.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach([100, 75, 50, 25, 0], id: \.self) { label in
+                    Text("\(label)%")
                         .font(.caption2)
-                        .foregroundColor(.secondary)
-                    Spacer()
+                        .foregroundStyle(.secondary)
+                        .frame(maxHeight: .infinity, alignment: .topLeading)
                 }
-                .frame(height: height / 4)
             }
         }
-        .frame(height: height)
     }
-    
+
     private var xAxisLabels: some View {
         HStack {
             ForEach(Array(data.enumerated()), id: \.offset) { index, trend in
-                if data.count <= 7 || index % max(1, data.count / 5) == 0 {
-                    Text(trend.date, style: .date)
+                if shouldShowLabel(for: index) {
+                    Text(trend.date, format: .dateTime.month(.abbreviated).day())
                         .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
                 }
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.leading, 28)
     }
-    
+
+    private func shouldShowLabel(for index: Int) -> Bool {
+        data.count <= 6 || index == 0 || index == data.count - 1 || index.isMultiple(of: max(data.count / 4, 1))
+    }
+
     private func calculatePoints(width: CGFloat, height: CGFloat) -> [CGPoint] {
         guard data.count >= 2 else { return [] }
-        
-        let xStep = width / CGFloat(data.count - 1)
-        
+        let xStep = width / CGFloat(max(data.count - 1, 1))
+
         return data.enumerated().map { index, trend in
-            let x = CGFloat(index) * xStep
-            let y = height - (CGFloat(trend.accuracy) / 100.0 * height)
-            return CGPoint(x: x, y: y)
+            CGPoint(
+                x: CGFloat(index) * xStep,
+                y: height - (CGFloat(trend.accuracy) / 100 * height)
+            )
         }
     }
-    
-    private func colorForAccuracy(_ accuracy: Double) -> Color {
+
+    private func tone(for accuracy: Double) -> AppStatusTone {
         switch accuracy {
-        case 90...100:
-            return .green
+        case 90...:
+            return .success
         case 70..<90:
-            return .orange
+            return .warning
         default:
-            return .red
+            return .danger
         }
     }
 }
@@ -184,9 +155,7 @@ struct AccuracyTrendChart: View {
         AccuracyTrend(date: Date().addingTimeInterval(-1 * 24 * 3600), accuracy: 90, questionsCount: 11),
         AccuracyTrend(date: Date(), accuracy: 95, questionsCount: 14)
     ]
-    
+
     AccuracyTrendChart(data: sampleData)
-        .frame(height: 200)
         .padding()
-        .background(Color.gray.opacity(0.1))
 }

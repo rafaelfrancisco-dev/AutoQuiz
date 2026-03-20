@@ -104,3 +104,48 @@ struct QuestionButtonStyle {
         )
     }
 }
+
+struct AnswerOptionButton: View {
+    let title: String
+    var subtitle: String? = nil
+    let style: QuestionButtonStyle
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                        .multilineTextAlignment(.leading)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(style.hasAnswered ? style.textColor.opacity(0.8) : .secondary)
+                            .multilineTextAlignment(.leading)
+                    }
+                }
+
+                Spacer(minLength: 12)
+
+                if !style.icon.isEmpty {
+                    Image(systemName: style.icon)
+                        .font(.headline)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+            .background(style.backgroundColor, in: .rect(cornerRadius: 16))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(style.borderColor, lineWidth: 1)
+            }
+            .foregroundStyle(style.textColor)
+            .contentShape(.rect(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(style.scale)
+        .animation(.easeOut(duration: 0.2), value: style.scale)
+    }
+}

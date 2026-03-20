@@ -6,67 +6,40 @@ struct DocumentQuestionAnsweringView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section("Ask a Question") {
-                    TextField(
-                        "Ask something about this document",
-                        text: $viewModel.documentQuestionInput,
-                        axis: .vertical
-                    )
-                    .lineLimit(3...6)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    questionComposer
 
-                    Button(action: submitQuestion) {
-                        if viewModel.isSubmittingDocumentQuestion {
-                            HStack(spacing: 8) {
-                                ProgressView()
-                                Text("Asking Document...")
-                            }
-                            .frame(maxWidth: .infinity)
-                        } else {
-                            Label("Ask Document", systemImage: "text.bubble")
-                                .frame(maxWidth: .infinity)
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(
-                        viewModel.isSubmittingDocumentQuestion ||
-                        viewModel.documentQuestionInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    )
-
-                    if let issueMessage = viewModel.documentQuestionAnswerIssueMessage {
-                        Text(issueMessage)
-                            .font(.caption)
-                            .foregroundStyle(.orange)
-                    }
-                }
-
-                Section {
                     if viewModel.isLoadingDocumentQuestionAnswers {
-                        HStack {
-                            ProgressView()
-                            Text("Loading saved answers...")
-                                .foregroundStyle(.secondary)
-                        }
+                        ProgressView("Loading saved answers...")
+                            .frame(maxWidth: .infinity, minHeight: 160)
                     } else if viewModel.documentQuestionAnswers.isEmpty {
-                        ContentUnavailableView(
-                            "No Saved Answers",
+                        AppEmptyState(
+                            title: "No Saved Answers",
                             systemImage: "text.bubble",
-                            description: Text("Ask a question to save a document-grounded answer for this version.")
+                            description: "Ask a question to save a document-grounded answer for this version."
                         )
                     } else {
-                        ForEach(viewModel.documentQuestionAnswers) { questionAnswer in
-                            DocumentQuestionAnswerRow(questionAnswer: questionAnswer)
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("Saved Answers")
+                                    .font(.headline)
+                                Spacer()
+                                AppBadge(
+                                    text: viewModel.selectedDocumentQuestionRevisionSelection.displayName(for: viewModel.item),
+                                    tone: .info
+                                )
+                            }
+
+                            ForEach(viewModel.documentQuestionAnswers) { questionAnswer in
+                                DocumentQuestionAnswerRow(questionAnswer: questionAnswer)
+                            }
                         }
                     }
-                } header: {
-                    HStack {
-                        Text("Saved Answers")
-                        Spacer()
-                        Text(viewModel.selectedDocumentQuestionRevisionSelection.displayName(for: viewModel.item))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
                 }
+                .padding()
+                .appContentWidth(820)
+                .accessibilityIdentifier("document-qa-screen")
             }
             .navigationTitle("Ask Document")
             .toolbar {
@@ -100,6 +73,46 @@ struct DocumentQuestionAnsweringView: View {
         }
     }
 
+    private var questionComposer: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Ask a Question")
+                .font(.headline)
+
+            TextField(
+                "Ask something about this document",
+                text: $viewModel.documentQuestionInput,
+                axis: .vertical
+            )
+            .lineLimit(3...6)
+
+            Button(action: submitQuestion) {
+                if viewModel.isSubmittingDocumentQuestion {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                        Text("Asking Document...")
+                    }
+                    .frame(maxWidth: .infinity)
+                } else {
+                    Label("Ask Document", systemImage: "text.bubble")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(
+                viewModel.isSubmittingDocumentQuestion ||
+                viewModel.documentQuestionInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            )
+            .accessibilityIdentifier("submit-document-question")
+
+            if let issueMessage = viewModel.documentQuestionAnswerIssueMessage {
+                Text(issueMessage)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+        .appCardStyle()
+    }
+
     private func submitQuestion() {
         Task {
             await viewModel.submitDocumentQuestion()
@@ -110,41 +123,42 @@ struct DocumentQuestionAnsweringView: View {
 private struct DocumentQuestionAnswerRow: View {
     let questionAnswer: DocumentQuestionAnswer
 
-    private var statusLabel: String {
+    private var statusTone: AppStatusTone {
         switch questionAnswer.responseKind {
         case .answered:
-            return "Document answer"
+            return .info
         case .insufficientDocumentContent:
-            return "Not supported by document"
+            return .warning
         }
     }
 
-    private var statusColor: Color {
+    private var statusLabel: String {
         switch questionAnswer.responseKind {
         case .answered:
-            return .secondary
+            return "Document Answer"
         case .insufficientDocumentContent:
-            return .orange
+            return "Not Supported by Document"
         }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                AppBadge(text: statusLabel, tone: statusTone)
+                Spacer()
+                AppBadge(text: "v\(questionAnswer.sourceContentRevision)", tone: .neutral)
+            }
+
             Text(questionAnswer.question)
                 .font(.headline)
 
             Text(questionAnswer.answer)
                 .foregroundStyle(.primary)
 
-            HStack {
-                Text(statusLabel)
-                Spacer()
-                Text("v\(questionAnswer.sourceContentRevision)")
-                Text(questionAnswer.timestamp, format: .dateTime.month().day().hour().minute())
-            }
-            .font(.caption)
-            .foregroundStyle(statusColor)
+            Text(questionAnswer.timestamp, format: .dateTime.month().day().hour().minute())
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
-        .padding(.vertical, 4)
+        .appCardStyle()
     }
 }

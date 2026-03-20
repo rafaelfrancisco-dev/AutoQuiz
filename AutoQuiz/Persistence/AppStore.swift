@@ -17,6 +17,13 @@ final class AppStore {
         self.isReady = persistenceStore != nil
     }
 
+    static func preview(items: [Item]) -> AppStore {
+        let store = AppStore()
+        store.items = items
+        store.isReady = true
+        return store
+    }
+
     func bootstrap() async {
         guard !isReady, !isBootstrapping else { return }
         isBootstrapping = true
@@ -30,6 +37,43 @@ final class AppStore {
         } catch {
             Logger.error.error("Failed to bootstrap AppStore: \(error.localizedDescription)")
             self.lastErrorMessage = error.localizedDescription
+        }
+    }
+
+    func loadFixture(
+        store: AutoQuizStore,
+        items: [Item],
+        quizSessions: [QuizSession] = [],
+        spacedRepetitionCards: [SpacedRepetitionCard] = [],
+        documentQuestionAnswers: [DocumentQuestionAnswer] = []
+    ) async {
+        isBootstrapping = true
+        defer { isBootstrapping = false }
+
+        do {
+            for item in items {
+                try await store.upsertItem(item)
+            }
+
+            for session in quizSessions {
+                try await store.upsertQuizSession(session)
+            }
+
+            for card in spacedRepetitionCards {
+                try await store.upsertSpacedRepetitionCard(card)
+            }
+
+            for answer in documentQuestionAnswers {
+                try await store.upsertDocumentQuestionAnswer(answer)
+            }
+
+            persistenceStore = store
+            self.items = await store.items()
+            isReady = true
+            lastErrorMessage = nil
+        } catch {
+            Logger.error.error("Failed to load fixture data: \(error.localizedDescription)")
+            lastErrorMessage = error.localizedDescription
         }
     }
 
