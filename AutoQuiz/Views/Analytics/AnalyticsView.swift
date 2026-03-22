@@ -34,7 +34,7 @@ struct AnalyticsView: View {
     }
 
     var body: some View {
-        AppModalContainer(title: document?.title ?? "Performance Analytics", maxWidth: 940, onDismiss: { dismiss() }) {
+        AppDashboardModalContainer(title: document?.title ?? "Performance Analytics", maxWidth: 980, onDismiss: { dismiss() }) {
             VStack(alignment: .leading, spacing: 20) {
                 timeRangeSelector
 

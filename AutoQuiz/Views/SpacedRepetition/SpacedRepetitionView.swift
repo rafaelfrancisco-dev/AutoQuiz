@@ -38,7 +38,7 @@ struct SpacedRepetitionView: View {
     }
 
     var body: some View {
-        AppModalContainer(title: "Spaced Repetition", maxWidth: 860, onDismiss: { dismiss() }) {
+        AppDashboardModalContainer(title: "Spaced Repetition", maxWidth: 900, onDismiss: { dismiss() }) {
             VStack(alignment: .leading, spacing: 20) {
                 if document != nil {
                     versionSelector

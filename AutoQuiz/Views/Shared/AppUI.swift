@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 enum AppStatusTone {
     case neutral
@@ -35,11 +38,19 @@ struct AppCardModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding()
-            .background(.regularMaterial, in: .rect(cornerRadius: 18))
+            .background(cardBackground, in: .rect(cornerRadius: 18))
             .overlay {
                 RoundedRectangle(cornerRadius: 18)
                     .stroke(Color.platformBorder.opacity(0.35), lineWidth: 1)
             }
+    }
+
+    private var cardBackground: some ShapeStyle {
+        #if os(macOS)
+        return .background
+        #else
+        return .regularMaterial
+        #endif
     }
 }
 
@@ -115,7 +126,81 @@ struct QuizActionButtonStyle: ButtonStyle {
     }
 }
 
-struct AppModalContainer<Content: View>: View {
+struct AppMacFormSection<Content: View>: View {
+    let title: String
+    var footer: String? = nil
+    let content: Content
+
+    init(
+        title: String,
+        footer: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.footer = footer
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+
+            content
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let footer {
+                Text(footer)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.background, in: .rect(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.platformBorder.opacity(0.5), lineWidth: 1)
+        }
+    }
+}
+
+struct AppMacModalHeader<TrailingContent: View>: View {
+    let title: String
+    var subtitle: String? = nil
+    let trailingContent: TrailingContent
+
+    init(
+        title: String,
+        subtitle: String? = nil,
+        @ViewBuilder trailingContent: () -> TrailingContent
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.trailingContent = trailingContent()
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.title3.weight(.semibold))
+
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer(minLength: 12)
+
+            trailingContent
+        }
+    }
+}
+
+struct AppDashboardModalContainer<Content: View>: View {
     let title: String
     var maxWidth: CGFloat = 720
     var onDismiss: (() -> Void)? = nil
@@ -134,6 +219,24 @@ struct AppModalContainer<Content: View>: View {
     }
 
     var body: some View {
+        #if os(macOS)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                AppMacModalHeader(title: title) {
+                    if let onDismiss {
+                        Button("Close", action: onDismiss)
+                    }
+                }
+
+                content
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(24)
+            .frame(maxWidth: maxWidth, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+        #else
         NavigationStack {
             ScrollView {
                 content
@@ -153,6 +256,7 @@ struct AppModalContainer<Content: View>: View {
                 }
             }
         }
+        #endif
     }
 }
 

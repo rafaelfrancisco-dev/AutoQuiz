@@ -189,42 +189,96 @@ struct DocumentView: View {
 
     @ViewBuilder
     private var fallbackLanguageSheet: some View {
-        NavigationStack {
-            List {
-                ForEach(viewModel.pendingSupportedLanguages, id: \.persistedIdentifier) { language in
-                    Button {
-                        selectedFallbackLanguageIdentifier = language.persistedIdentifier
-                    } label: {
-                        HStack {
-                            Text(localizedLanguageName(for: language))
-                            Spacer()
-                            if selectedFallbackLanguageIdentifier == language.persistedIdentifier {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(.blue)
+        Group {
+            #if os(macOS)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    AppMacModalHeader(
+                        title: "Choose Language",
+                        subtitle: "Select a supported language so question generation can continue."
+                    ) {
+                        Button("Cancel") {
+                            viewModel.isShowingLanguageSelection = false
+                        }
+                    }
+
+                    AppMacFormSection(title: "Supported Languages") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(viewModel.pendingSupportedLanguages, id: \.persistedIdentifier) { language in
+                                Button {
+                                    selectedFallbackLanguageIdentifier = language.persistedIdentifier
+                                } label: {
+                                    HStack {
+                                        Text(localizedLanguageName(for: language))
+                                        Spacer()
+                                        if selectedFallbackLanguageIdentifier == language.persistedIdentifier {
+                                            Image(systemName: "checkmark")
+                                                .foregroundStyle(.blue)
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .buttonStyle(.borderless)
+                                .foregroundStyle(.primary)
                             }
                         }
                     }
-                    .foregroundStyle(.primary)
-                }
-            }
-            .navigationTitle("Choose Language")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        viewModel.isShowingLanguageSelection = false
-                    }
-                }
 
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Continue") {
-                        guard let selectedFallbackLanguageIdentifier else { return }
-                        viewModel.applyFallbackLanguage(Locale.Language(identifier: selectedFallbackLanguageIdentifier))
+                    HStack {
+                        Spacer()
+
+                        Button("Continue") {
+                            guard let selectedFallbackLanguageIdentifier else { return }
+                            viewModel.applyFallbackLanguage(Locale.Language(identifier: selectedFallbackLanguageIdentifier))
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(selectedFallbackLanguageIdentifier == nil)
                     }
-                    .disabled(selectedFallbackLanguageIdentifier == nil)
+                }
+                .padding(24)
+                .frame(maxWidth: 460, alignment: .topLeading)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+            .macModalSize(.utilityCompact)
+            #else
+            NavigationStack {
+                List {
+                    ForEach(viewModel.pendingSupportedLanguages, id: \.persistedIdentifier) { language in
+                        Button {
+                            selectedFallbackLanguageIdentifier = language.persistedIdentifier
+                        } label: {
+                            HStack {
+                                Text(localizedLanguageName(for: language))
+                                Spacer()
+                                if selectedFallbackLanguageIdentifier == language.persistedIdentifier {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(.blue)
+                                }
+                            }
+                        }
+                        .foregroundStyle(.primary)
+                    }
+                }
+                .navigationTitle("Choose Language")
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            viewModel.isShowingLanguageSelection = false
+                        }
+                    }
+
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Continue") {
+                            guard let selectedFallbackLanguageIdentifier else { return }
+                            viewModel.applyFallbackLanguage(Locale.Language(identifier: selectedFallbackLanguageIdentifier))
+                        }
+                        .disabled(selectedFallbackLanguageIdentifier == nil)
+                    }
                 }
             }
+            .macModalSize(.utilityCompact)
+            #endif
         }
-        .macModalSize(.languageSelection)
         .onAppear {
             if selectedFallbackLanguageIdentifier == nil {
                 selectedFallbackLanguageIdentifier = viewModel.pendingSupportedLanguages.first?.persistedIdentifier
@@ -479,6 +533,37 @@ private struct DocumentStartActions: View {
     let onSpacedRepetition: () -> Void
 
     var body: some View {
+        #if os(macOS)
+        macBody
+        #else
+        mobileBody
+        #endif
+    }
+
+    #if os(macOS)
+    private var macBody: some View {
+        VStack(spacing: 12) {
+            Button(action: onStartQuiz) {
+                Label("Start Quiz", systemImage: "play.fill")
+            }
+            .buttonStyle(QuizActionButtonStyle(tone: .info))
+            .disabled(isGenerating)
+            .accessibilityIdentifier("open-quiz-options")
+
+            if isGenerating {
+                Label("Generating questions", systemImage: "sparkles")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 4)
+            }
+
+            supportingActions
+        }
+    }
+    #endif
+
+    private var mobileBody: some View {
         VStack(spacing: 12) {
             Button("Start Quiz", action: onStartQuiz)
                 .buttonStyle(.borderedProminent)
@@ -486,6 +571,12 @@ private struct DocumentStartActions: View {
                 .disabled(isGenerating)
                 .accessibilityIdentifier("open-quiz-options")
 
+            supportingActions
+        }
+    }
+
+    private var supportingActions: some View {
+        Group {
             Button {
                 onAskDocument()
             } label: {

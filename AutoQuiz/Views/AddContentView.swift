@@ -41,6 +41,103 @@ struct AddContentView: View {
     }
 
     var body: some View {
+        #if os(macOS)
+        macBody
+        #else
+        mobileBody
+        #endif
+    }
+
+    #if os(macOS)
+    private var macBody: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                AppMacModalHeader(
+                    title: "Add Content",
+                    subtitle: "Append new material to this document and regenerate its questions."
+                ) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+
+                AppMacFormSection(title: "Content Source") {
+                    Picker("Content Source", selection: $contentSource) {
+                        ForEach(ContentSource.allCases, id: \.self) { source in
+                            Text(source.rawValue)
+                                .tag(source)
+                        }
+                    }
+                    .pickerStyle(.radioGroup)
+                    .labelsHidden()
+                }
+
+                if contentSource == .file {
+                    AppMacFormSection(
+                        title: "Import File",
+                        footer: "Select a text file or PDF to append to this document."
+                    ) {
+                        Button(action: triggerFileImport) {
+                            Label("Choose File", systemImage: "doc.badge.plus")
+                        }
+                    }
+                } else {
+                    AppMacFormSection(
+                        title: "Additional Content",
+                        footer: "Enter additional text content to append to this document."
+                    ) {
+                        TextEditor(text: $newContent)
+                            .font(.body)
+                            .frame(minHeight: 220)
+                            .padding(10)
+                            .background(Color.platformControlBackground, in: .rect(cornerRadius: 12))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.platformBorder.opacity(0.55), lineWidth: 1)
+                            }
+                    }
+                }
+
+                HStack {
+                    Spacer()
+
+                    Button("Cancel") {
+                        dismiss()
+                    }
+
+                    Button("Add") {
+                        submitContent()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(contentSource == .text && trimmedContent.isEmpty)
+                }
+            }
+            .padding(24)
+            .frame(maxWidth: 620, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .accessibilityIdentifier("add-content-screen")
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+        .macModalSize(.utilityForm)
+        .alert("Error", isPresented: errorBinding) {
+            Button("OK") {
+                errorMessage = nil
+            }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+        .alert("Success", isPresented: successBinding) {
+            Button("OK") {
+                successMessage = nil
+                dismiss()
+            }
+        } message: {
+            Text(successMessage ?? "")
+        }
+    }
+    #endif
+
+    private var mobileBody: some View {
         NavigationStack {
             Form {
                 Section("Content Source") {
@@ -92,17 +189,13 @@ struct AddContentView: View {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
-                        if contentSource == .file {
-                            triggerFileImport()
-                        } else {
-                            addTextContent()
-                        }
+                        submitContent()
                     }
                     .disabled(contentSource == .text && trimmedContent.isEmpty)
                 }
             }
         }
-        .macModalSize(.form)
+        .macModalSize(.utilityForm)
         #if os(iOS)
         .sheet(isPresented: $isPickerPresented) {
             DocumentPicker { url in
@@ -199,6 +292,14 @@ struct AddContentView: View {
     private func addTextContent() {
         guard !trimmedContent.isEmpty else { return }
         appendContent(trimmedContent)
+    }
+
+    private func submitContent() {
+        if contentSource == .file {
+            triggerFileImport()
+        } else {
+            addTextContent()
+        }
     }
 
     private func appendContent(_ content: String) {

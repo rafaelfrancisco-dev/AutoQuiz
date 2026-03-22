@@ -6,6 +6,9 @@
 //
 
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 struct QuizOptionsView: View {
     @State private var settings = QuizSettings.default
@@ -14,6 +17,105 @@ struct QuizOptionsView: View {
     let onStartQuiz: (QuizSettings) -> Void
 
     var body: some View {
+        #if os(macOS)
+        macBody
+        #else
+        mobileBody
+        #endif
+    }
+
+    #if os(macOS)
+    private var macBody: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                AppMacModalHeader(
+                    title: "Quiz Options",
+                    subtitle: "Choose the question style and quiz behavior for this document."
+                ) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+
+                AppMacFormSection(title: "Question Type") {
+                    Picker("Question Type", selection: $settings.questionType) {
+                        ForEach(Question.allCases.filter { $0 != .spacedRepetition }, id: \.self) { type in
+                            Text(type.displayName)
+                                .tag(type)
+                        }
+                    }
+                    .pickerStyle(.radioGroup)
+                    .labelsHidden()
+                    .accessibilityIdentifier("quiz-question-type-picker")
+                }
+
+                AppMacFormSection(
+                    title: "Quiz Length",
+                    footer: "Set the maximum number of questions for this quiz session."
+                ) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        LabeledContent("Maximum Questions", value: settings.maxQuestionsDescription)
+
+                        if !settings.isUnlimitedQuestions {
+                            Slider(
+                                value: Binding(
+                                    get: { Double(settings.maxQuestions) },
+                                    set: { settings.maxQuestions = Int($0) }
+                                ),
+                                in: 1...50,
+                                step: 1
+                            )
+                        }
+
+                        Toggle("Unlimited Questions", isOn: unlimitedQuestionsBinding)
+                        Toggle("Shuffle Questions", isOn: $settings.shuffleQuestions)
+                    }
+                    .controlSize(.regular)
+                }
+
+                AppMacFormSection(
+                    title: "Quiz Behavior",
+                    footer: "Include previously missed questions and control whether unanswered questions can be skipped."
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Toggle("Include Previously Failed Questions", isOn: $settings.includeFailedQuestions)
+                        Toggle("Allow Skipping Questions", isOn: $settings.allowSkipQuestions)
+                    }
+                }
+
+                AppMacFormSection(
+                    title: "Language Settings",
+                    footer: "If the detected language is unsupported, the app will ask you to choose a supported fallback language."
+                ) {
+                    Toggle("Use Original Document Language", isOn: $settings.useOriginalLanguage)
+                }
+
+                HStack {
+                    Spacer()
+
+                    Button("Cancel") {
+                        dismiss()
+                    }
+
+                    Button("Start Quiz") {
+                        startQuiz()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!settings.isValid)
+                    .accessibilityIdentifier("confirm-start-quiz")
+                }
+            }
+            .padding(24)
+            .frame(maxWidth: 620, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .accessibilityIdentifier("quiz-options-screen")
+        }
+        .background(Color(nsColor: .windowBackgroundColor))
+        .macModalSize(.utilityForm)
+    }
+    #endif
+
+    private var mobileBody: some View {
         NavigationStack {
             Form {
                 Section("Question Type") {
@@ -80,8 +182,7 @@ struct QuizOptionsView: View {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Start Quiz") {
-                        onStartQuiz(settings)
-                        dismiss()
+                        startQuiz()
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(!settings.isValid)
@@ -89,7 +190,7 @@ struct QuizOptionsView: View {
                 }
             }
         }
-        .macModalSize(.form)
+        .macModalSize(.utilityForm)
     }
 
     private var unlimitedQuestionsBinding: Binding<Bool> {
@@ -103,6 +204,11 @@ struct QuizOptionsView: View {
                 }
             }
         )
+    }
+
+    private func startQuiz() {
+        onStartQuiz(settings)
+        dismiss()
     }
 }
 

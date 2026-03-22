@@ -35,7 +35,7 @@ struct HistoricalQuestionsView: View {
     }
 
     var body: some View {
-        AppModalContainer(title: "Question History", maxWidth: 820, onDismiss: { dismiss() }) {
+        AppDashboardModalContainer(title: "Question History", maxWidth: 860, onDismiss: { dismiss() }) {
             VStack(alignment: .leading, spacing: 16) {
                 Picker("Content Version", selection: $selectedRevisionSelection) {
                     ForEach(revisionOptions, id: \.self) { selection in

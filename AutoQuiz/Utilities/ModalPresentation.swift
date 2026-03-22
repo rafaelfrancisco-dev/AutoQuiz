@@ -1,32 +1,34 @@
 import SwiftUI
 
 enum MacModalSizePreset {
-    case languageSelection
-    case form
+    case utilityCompact
+    case utilityForm
     case history
     case dashboard
 
     var minWidth: CGFloat {
         switch self {
-        case .languageSelection:
+        case .utilityCompact:
             return 420
-        case .form:
-            return 500
+        case .utilityForm:
+            return 560
         case .history:
-            return 600
+            return 720
         case .dashboard:
-            return 900
+            return 960
         }
     }
 
     var minHeight: CGFloat {
         switch self {
-        case .languageSelection:
-            return 360
-        case .form, .history:
-            return 400
+        case .utilityCompact:
+            return 320
+        case .utilityForm:
+            return 460
+        case .history:
+            return 520
         case .dashboard:
-            return 620
+            return 680
         }
     }
 }
