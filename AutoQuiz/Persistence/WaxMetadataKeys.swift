@@ -7,6 +7,7 @@ enum WaxMetadataKeys {
     static let contentRevision = "aq.content.revision"
     static let chunkDocumentID = "aq.chunk.documentID"
     static let chunkRevision = "aq.chunk.revision"
+    static let chunkEmbeddingLanguage = "aq.chunk.embeddingLanguage"
 }
 
 enum WaxEntityType: String, Codable {

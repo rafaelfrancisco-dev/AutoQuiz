@@ -8,6 +8,7 @@ final class AppStore {
     private(set) var items: [Item] = []
     private(set) var isReady = false
     private(set) var isBootstrapping = false
+    private(set) var isIndexingChunks = false
     private(set) var lastErrorMessage: String?
 
     private(set) var persistenceStore: AutoQuizStore?
@@ -32,6 +33,11 @@ final class AppStore {
         do {
             let store = try await AutoQuizStore.openDefault()
             self.persistenceStore = store
+            await store.setOnIndexingStateChanged { [weak self] isIndexing in
+                Task { @MainActor [weak self] in
+                    self?.isIndexingChunks = isIndexing
+                }
+            }
             self.items = await store.items()
             self.isReady = true
         } catch {
@@ -67,6 +73,11 @@ final class AppStore {
                 try await store.upsertDocumentQuestionAnswer(answer)
             }
 
+            await store.setOnIndexingStateChanged { [weak self] isIndexing in
+                Task { @MainActor [weak self] in
+                    self?.isIndexingChunks = isIndexing
+                }
+            }
             persistenceStore = store
             self.items = await store.items()
             isReady = true

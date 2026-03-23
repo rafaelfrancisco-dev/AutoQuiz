@@ -16,6 +16,8 @@ actor AutoQuizStore {
     private var cardFramesByID: [UUID: UInt64] = [:]
     private var documentQuestionAnswerFramesByID: [UUID: UInt64] = [:]
     private var chunkFramesByDocumentID: [UUID: [UInt64]] = [:]
+    private var embeddingLanguageByDocumentID: [UUID: NLLanguage] = [:]
+    private var onIndexingStateChanged: (@Sendable (Bool) -> Void)?
 
     private var itemsByID: [UUID: Item] = [:]
     private var answersByID: [UUID: AnsweredQuestion] = [:]
@@ -127,7 +129,7 @@ actor AutoQuizStore {
         itemsByID[item.id] = item
 
         if previousRevision != item.contentRevision {
-            await indexDocumentChunks(item: item)
+            Task { await self.indexDocumentChunks(item: item) }
         }
     }
 
@@ -260,10 +262,15 @@ actor AutoQuizStore {
         documentQuestionAnswersByID[questionAnswer.id] = questionAnswer
     }
 
+    func setOnIndexingStateChanged(_ callback: @escaping @Sendable (Bool) -> Void) {
+        onIndexingStateChanged = callback
+    }
+
     // MARK: - Vector Search
 
     func searchDocumentContent(query: String, documentID: UUID, topK: Int = 5) async throws -> [String] {
-        let queryVector = try await embedder.embed(query)
+        let embeddingLanguage = embeddingLanguageByDocumentID[documentID] ?? .english
+        let queryVector = try await embedder.embed(query, language: embeddingLanguage)
         let request = SearchRequest(
             embedding: queryVector,
             mode: .vectorOnly,
@@ -346,6 +353,9 @@ actor AutoQuizStore {
     // MARK: - Private
 
     private func indexDocumentChunks(item: Item) async {
+        onIndexingStateChanged?(true)
+        defer { onIndexingStateChanged?(false) }
+
         if let oldFrameIDs = chunkFramesByDocumentID[item.id] {
             for frameID in oldFrameIDs {
                 try? await wax.delete(frameId: frameID)
@@ -356,13 +366,17 @@ actor AutoQuizStore {
         let trimmedContent = item.content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedContent.isEmpty else { return }
 
+        let detectedLanguage = NLLanguageRecognizer.dominantLanguage(for: trimmedContent) ?? .english
+        embeddingLanguageByDocumentID[item.id] = detectedLanguage
+        Logger.generation.debug("Detected embedding language '\(detectedLanguage.rawValue, privacy: .public)' for document \(item.id.uuidString, privacy: .public)")
+
         let chunks = trimmedContent.chunked(into: 2000)
         var newFrameIDs: [UInt64] = []
 
         for (index, chunk) in chunks.enumerated() {
             guard let chunkData = chunk.data(using: .utf8) else { continue }
             do {
-                let vector = try await embedder.embed(chunk)
+                let vector = try await embedder.embed(chunk, language: detectedLanguage)
                 let frameID = try await session.put(
                     chunkData,
                     embedding: vector,
@@ -371,7 +385,8 @@ actor AutoQuizStore {
                         metadata: Metadata([
                             WaxMetadataKeys.entityType: "document_chunk",
                             WaxMetadataKeys.chunkDocumentID: item.id.uuidString,
-                            WaxMetadataKeys.chunkRevision: String(item.contentRevision)
+                            WaxMetadataKeys.chunkRevision: String(item.contentRevision),
+                            WaxMetadataKeys.chunkEmbeddingLanguage: detectedLanguage.rawValue
                         ])
                     )
                 )
@@ -443,6 +458,9 @@ actor AutoQuizStore {
                 if let docIDString = metadata[WaxMetadataKeys.chunkDocumentID],
                    let docID = UUID(uuidString: docIDString) {
                     chunkFramesByDocumentID[docID, default: []].append(meta.id)
+                    if let langValue = metadata[WaxMetadataKeys.chunkEmbeddingLanguage] {
+                        embeddingLanguageByDocumentID[docID] = NLLanguage(langValue)
+                    }
                 }
                 continue
             }

@@ -6,12 +6,17 @@ struct NLEmbeddingProvider: EmbeddingProvider {
     var dimensions: Int { 512 }
     var normalize: Bool { true }
     var identity: EmbeddingIdentity? {
-        EmbeddingIdentity(provider: "NLEmbedding", model: "sentence-en", dimensions: 512, normalized: true)
+        EmbeddingIdentity(provider: "NLEmbedding", model: "sentence-multilingual", dimensions: 512, normalized: true)
     }
 
     func embed(_ text: String) async throws -> [Float] {
-        guard let embedding = NLEmbedding.sentenceEmbedding(for: .english),
-              let vector = embedding.vector(for: text) else {
+        let detectedLanguage = NLLanguageRecognizer.dominantLanguage(for: text) ?? .english
+        return try await embed(text, language: detectedLanguage)
+    }
+
+    func embed(_ text: String, language: NLLanguage) async throws -> [Float] {
+        let embedding = NLEmbedding.sentenceEmbedding(for: language) ?? NLEmbedding.sentenceEmbedding(for: .english)
+        guard let embedding, let vector = embedding.vector(for: text) else {
             throw EmbeddingError.unavailable
         }
         var floats = vector.map(Float.init)

@@ -316,6 +316,12 @@ struct DocumentView: View {
                 message: generationIssueMessage,
                 tone: .warning
             )
+        } else if appStore.isIndexingChunks {
+            DocumentStatusCard(
+                title: "Indexing Document",
+                message: "Setting up semantic search for Q&A. This runs in the background.",
+                tone: .info
+            )
         } else if !viewModel.isGenerating && !hasQuestionsForType(viewModel.selectedQuestionType) {
             DocumentStatusCard(
                 title: "Preparing Questions",
