@@ -53,6 +53,8 @@ struct QuestionButtonStyle {
     }
     
     var icon: String {
+        guard hasAnswered else { return "" }
+
         if isCorrect {
             return "checkmark.circle.fill"
         } else if isSelected {
