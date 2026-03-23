@@ -378,11 +378,21 @@ final class Generator {
 
     func answerQuestionAboutDocument(
         _ question: String,
-        languageMode: QuizGenerationLanguageMode
+        languageMode: QuizGenerationLanguageMode,
+        preloadedChunks: [String]? = nil
     ) async throws -> DocumentAnswerResult {
         let language = try resolveLanguageOrThrow(mode: languageMode)
         let session = try createSession(language: language)
-        let documentContext = rankedDocumentContext(for: question)
+
+        let documentContext: String
+        if let chunks = preloadedChunks, !chunks.isEmpty {
+            Logger.generation.debug("Using \(chunks.count) semantic chunks for document Q&A")
+            documentContext = chunks.enumerated().map { index, chunk in
+                "Excerpt \(index + 1):\n\(chunk.trimmingCharacters(in: .whitespacesAndNewlines))"
+            }.joined(separator: "\n\n")
+        } else {
+            documentContext = rankedDocumentContext(for: question)
+        }
 
         do {
             let response = try await session.respond(

@@ -80,7 +80,16 @@ final class DocumentViewModel {
         self.generator = generator
         self.appStore = appStore
         self.documentAnswerProvider = documentAnswerProvider ?? { question, languageMode in
-            try await generator.answerQuestionAboutDocument(question, languageMode: languageMode)
+            let chunks = try? await appStore?.searchDocumentContent(query: question, documentID: item.id)
+            return try await generator.answerQuestionAboutDocument(question, languageMode: languageMode, preloadedChunks: chunks)
+        }
+    }
+
+    func persistDocumentMetadata() {
+        guard let appStore else { return }
+        let item = self.item
+        Task {
+            await appStore.updateDocumentFacts(item: item, title: item.title, detectedLanguage: nil)
         }
     }
 

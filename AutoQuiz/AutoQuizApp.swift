@@ -34,6 +34,7 @@ struct AutoQuizApp: App {
             let storeURL = FileManager.default.temporaryDirectory
                 .appendingPathComponent("AutoQuiz-UITests-\(UUID().uuidString)")
                 .appendingPathExtension("mv2s")
+            
             let store = try await AutoQuizStore.open(at: storeURL)
             let item = PreviewData.sampleItem()
 

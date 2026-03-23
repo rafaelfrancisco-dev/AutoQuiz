@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(xcodebuild -scheme AutoQuiz -configuration Debug -destination 'platform=macOS' build)",
+      "WebFetch(domain:github.com)",
+      "Bash(find ~/Library/Developer/Xcode/DerivedData -path *SourcePackages* -name *[Ww]ax* -type d)",
+      "Bash(find /Users/rafaelfrancisco/Library/Developer/Xcode/DerivedData/AutoQuiz-fngtkzkpmcwvdufbvxukzlnifxpu/SourcePackages/checkouts/Wax/Sources -name *.swift -type f)",
+      "Bash(find /Users/rafaelfrancisco/Developer/AutoQuiz -name *.swiftinterface -o -name *.swiftmodule)",
+      "Bash(find /Users/rafaelfrancisco/Developer/AutoQuiz -path */Wax* -name *.swift)",
+      "Bash(find ~/Library/Developer/Xcode/DerivedData -path *AutoQuiz* -name *.swiftinterface)",
+      "Bash(find ~/Library/Developer/Xcode/DerivedData -path *AutoQuiz* -name *.swiftmodule -path *Wax*)",
+      "Bash(xcodebuild test:*)"
+    ]
+  }
+}

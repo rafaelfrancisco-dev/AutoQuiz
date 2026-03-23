@@ -8,12 +8,14 @@ actor AutoQuizStore {
     private let session: WaxSession
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+    private let embedder = NLEmbeddingProvider()
 
     private var itemFramesByID: [UUID: UInt64] = [:]
     private var answerFramesByID: [UUID: UInt64] = [:]
     private var sessionFramesByID: [UUID: UInt64] = [:]
     private var cardFramesByID: [UUID: UInt64] = [:]
     private var documentQuestionAnswerFramesByID: [UUID: UInt64] = [:]
+    private var chunkFramesByDocumentID: [UUID: [UInt64]] = [:]
 
     private var itemsByID: [UUID: Item] = [:]
     private var answersByID: [UUID: AnsweredQuestion] = [:]
@@ -47,8 +49,9 @@ actor AutoQuizStore {
             .readWrite(.wait),
             config: .init(
                 enableTextSearch: true,
-                enableVectorSearch: false,
-                enableStructuredMemory: false
+                enableVectorSearch: true,
+                enableStructuredMemory: true,
+                vectorDimensions: NLEmbeddingProvider().dimensions
             )
         )
 
@@ -107,6 +110,7 @@ actor AutoQuizStore {
     }
 
     func upsertItem(_ item: Item) async throws {
+        let previousRevision = itemsByID[item.id]?.contentRevision
         let previousFrame = itemFramesByID[item.id]
         let frameID = try await persist(
             entityType: .item,
@@ -121,6 +125,10 @@ actor AutoQuizStore {
 
         itemFramesByID[item.id] = frameID
         itemsByID[item.id] = item
+
+        if previousRevision != item.contentRevision {
+            await indexDocumentChunks(item: item)
+        }
     }
 
     func deleteItem(id: UUID) async throws {
@@ -131,6 +139,13 @@ actor AutoQuizStore {
 
         itemFramesByID.removeValue(forKey: id)
         itemsByID.removeValue(forKey: id)
+
+        if let chunkFrameIDs = chunkFramesByDocumentID[id] {
+            for chunkFrameID in chunkFrameIDs {
+                try? await wax.delete(frameId: chunkFrameID)
+            }
+            chunkFramesByDocumentID.removeValue(forKey: id)
+        }
 
         let answersToDelete = answersByID.values.filter { $0.itemID == id }.map(\.id)
         for answerID in answersToDelete {
@@ -245,6 +260,138 @@ actor AutoQuizStore {
         documentQuestionAnswersByID[questionAnswer.id] = questionAnswer
     }
 
+    // MARK: - Vector Search
+
+    func searchDocumentContent(query: String, documentID: UUID, topK: Int = 5) async throws -> [String] {
+        let queryVector = try await embedder.embed(query)
+        let request = SearchRequest(
+            embedding: queryVector,
+            mode: .vectorOnly,
+            topK: topK * 2,
+            frameFilter: FrameFilter(
+                metadataFilter: MetadataFilter(
+                    requiredEntries: [WaxMetadataKeys.chunkDocumentID: documentID.uuidString]
+                )
+            )
+        )
+        let response = try await session.search(request)
+
+        var chunks: [String] = []
+        for result in response.results.prefix(topK) {
+            if let content = try? await wax.frameContent(frameId: result.frameId),
+               let text = String(data: content, encoding: .utf8) {
+                chunks.append(text)
+            }
+        }
+        Logger.generation.debug("Semantic search returned \(chunks.count) chunks for document Q&A")
+        return chunks
+    }
+
+    // MARK: - Structured Memory
+
+    func assertDocumentFacts(item: Item, title: String?, detectedLanguage: String?) async {
+        let nowMs = Int64(Date().timeIntervalSince1970 * 1000)
+        let entityKey = EntityKey("doc:\(item.id.uuidString)")
+
+        do {
+            let aliases = [title].compactMap { $0 }
+            _ = try await session.upsertEntity(key: entityKey, kind: "document", aliases: aliases, nowMs: nowMs)
+
+            let timeRange = StructuredTimeRange(fromMs: nowMs, toMs: nil)
+            let evidence = StructuredEvidence(
+                sourceFrameId: itemFramesByID[item.id] ?? 0,
+                extractorId: "autoquiz",
+                extractorVersion: "1",
+                assertedAtMs: nowMs
+            )
+
+            if let title {
+                _ = try await session.assertFact(
+                    subject: entityKey,
+                    predicate: PredicateKey("title"),
+                    object: .string(title),
+                    valid: timeRange,
+                    system: timeRange,
+                    evidence: [evidence]
+                )
+            }
+
+            _ = try await session.assertFact(
+                subject: entityKey,
+                predicate: PredicateKey("contentRevision"),
+                object: .int(Int64(item.contentRevision)),
+                valid: timeRange,
+                system: timeRange,
+                evidence: [evidence]
+            )
+
+            if let lang = detectedLanguage {
+                _ = try await session.assertFact(
+                    subject: entityKey,
+                    predicate: PredicateKey("language"),
+                    object: .string(lang),
+                    valid: timeRange,
+                    system: timeRange,
+                    evidence: [evidence]
+                )
+            }
+
+            try await session.commit()
+            Logger.database.debug("Asserted structured facts for document \(item.id.uuidString, privacy: .public)")
+        } catch {
+            Logger.database.warning("Failed to assert document facts: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Private
+
+    private func indexDocumentChunks(item: Item) async {
+        if let oldFrameIDs = chunkFramesByDocumentID[item.id] {
+            for frameID in oldFrameIDs {
+                try? await wax.delete(frameId: frameID)
+            }
+            chunkFramesByDocumentID.removeValue(forKey: item.id)
+        }
+
+        let trimmedContent = item.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedContent.isEmpty else { return }
+
+        let chunks = trimmedContent.chunked(into: 2000)
+        var newFrameIDs: [UInt64] = []
+
+        for (index, chunk) in chunks.enumerated() {
+            guard let chunkData = chunk.data(using: .utf8) else { continue }
+            do {
+                let vector = try await embedder.embed(chunk)
+                let frameID = try await session.put(
+                    chunkData,
+                    embedding: vector,
+                    options: FrameMetaSubset(
+                        kind: "autoquiz.document_chunk",
+                        metadata: Metadata([
+                            WaxMetadataKeys.entityType: "document_chunk",
+                            WaxMetadataKeys.chunkDocumentID: item.id.uuidString,
+                            WaxMetadataKeys.chunkRevision: String(item.contentRevision)
+                        ])
+                    )
+                )
+                newFrameIDs.append(frameID)
+            } catch {
+                Logger.generation.warning("Failed to index document chunk \(index): \(error.localizedDescription)")
+            }
+        }
+
+        if !newFrameIDs.isEmpty {
+            do {
+                try await session.commit()
+                chunkFramesByDocumentID[item.id] = newFrameIDs
+                Logger.generation.debug("Indexed \(newFrameIDs.count) chunks for document \(item.id.uuidString, privacy: .public)")
+            } catch {
+                Logger.database.warning("Failed to commit chunk embeddings: \(error.localizedDescription)")
+            }
+        }
+    }
+
     private func persist<T: Codable>(
         entityType: WaxEntityType,
         entityID: UUID,
@@ -288,11 +435,19 @@ actor AutoQuizStore {
         let metas = await wax.frameMetas().sorted { $0.id < $1.id }
 
         for meta in metas {
-            guard meta.supersededBy == nil,
-                  meta.status == .active,
-                  let metadata = meta.metadata?.entries,
-                  let typeValue = metadata[WaxMetadataKeys.entityType],
-                  let entityType = WaxEntityType(rawValue: typeValue),
+            guard meta.supersededBy == nil, meta.status == .active else { continue }
+            guard let metadata = meta.metadata?.entries,
+                  let typeValue = metadata[WaxMetadataKeys.entityType] else { continue }
+
+            if typeValue == "document_chunk" {
+                if let docIDString = metadata[WaxMetadataKeys.chunkDocumentID],
+                   let docID = UUID(uuidString: docIDString) {
+                    chunkFramesByDocumentID[docID, default: []].append(meta.id)
+                }
+                continue
+            }
+
+            guard let entityType = WaxEntityType(rawValue: typeValue),
                   let entityIDString = metadata[WaxMetadataKeys.entityID],
                   let entityID = UUID(uuidString: entityIDString)
             else {

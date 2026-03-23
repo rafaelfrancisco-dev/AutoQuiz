@@ -437,6 +437,7 @@ struct DocumentView: View {
                 viewModel.generationIssue = nil
             }
             viewModel.persistItemChanges()
+            viewModel.persistDocumentMetadata()
         } catch let error as GeneratorError {
             viewModel.generationIssue = error
             Logger.error.error("Failed to generate title: \(error.userFacingMessage)")

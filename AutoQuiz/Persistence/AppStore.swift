@@ -193,4 +193,12 @@ final class AppStore {
             sourceContentRevision: sourceContentRevision
         )
     }
+
+    func searchDocumentContent(query: String, documentID: UUID) async throws -> [String] {
+        try await persistenceStore?.searchDocumentContent(query: query, documentID: documentID) ?? []
+    }
+
+    func updateDocumentFacts(item: Item, title: String?, detectedLanguage: String? = nil) async {
+        await persistenceStore?.assertDocumentFacts(item: item, title: title, detectedLanguage: detectedLanguage)
+    }
 }
