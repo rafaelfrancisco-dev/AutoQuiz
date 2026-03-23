@@ -17,7 +17,7 @@ struct QuizSessionMetricsRecordingTests {
         let question = MultipleChoiceQuestion(
             question: "What is 2 + 2?",
             options: ["1", "2", "3", "4"],
-            anwswer: "4"
+            answer: "4"
         )
         item.questions = [question]
         

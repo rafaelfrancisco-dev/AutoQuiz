@@ -39,7 +39,7 @@ extension DocumentViewModel {
             itemID: item.id,
             questionText: question.question,
             userAnswer: userAnswer,
-            correctAnswer: question.anwswer,
+            correctAnswer: question.answer,
             isCorrect: correct,
             pointsEarned: pointsEarned,
             questionType: .multipleChoice,

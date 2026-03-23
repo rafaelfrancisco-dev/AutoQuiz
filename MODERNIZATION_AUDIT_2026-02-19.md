@@ -6,24 +6,15 @@ Scope: iOS/macOS SwiftUI app using SwiftData + Foundation Models; project was st
 
 ## Executive Summary
 
-Primary modernization risks are:
-
-1. Data model typo (`anwswer`) has become part of persisted contracts and should be migrated carefully.
+All previously identified P1 risks have been resolved.
 
 ## Prioritized Findings
 
-## P1 (High Value Next)
+## ✅ Resolved
 
-### 1) `anwswer` field typo should be migrated safely
-- Evidence:
-  - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Models/Questions/MultipleChoiceQuestion.swift:20`
-  - `/Users/rafaelfrancisco/Developer/AutoQuiz/AutoQuiz/Services/SpacedRepetitionService.swift:31`
-- Detail:
-  - Misspelled property is used throughout generation/storage.
-- Impact:
-  - Long-term maintenance and schema clarity issues.
-- Recommendation:
-  - Plan schema bump with backward-compatible decode mapping, then migrate to `answer`.
+### 1) `anwswer` field typo — **fixed 2026-03-23**
+- `MultipleChoiceQuestion.anwswer` renamed to `answer` across all call sites.
+- `MultipleChoiceQuestion` is a transient `@Generable` struct, not a persisted entity, so no schema migration was required.
 
 ### 2) Test coverage is placeholder-only
 - Evidence:
@@ -54,7 +45,7 @@ Primary modernization risks are:
 
 ## Recommended Implementation Order
 
-1. Plan and execute `anwswer` -> `answer` migration.
+1. ~~Plan and execute `anwswer` -> `answer` migration.~~ ✅ Done 2026-03-23
 2. Tackle lint cleanup with an automated formatting pass + lint baseline reduction.
 
 ## Open Decisions For Next Session

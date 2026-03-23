@@ -16,6 +16,7 @@ struct SpacedRepetitionView: View {
     @State private var isSessionComplete = false
     @State private var sessionStats: SessionStats?
     @State private var selectedRevisionSelection: ContentRevisionSelection = .current
+    @State private var isLoadingSession = true
 
     let document: Item?
     private let previewSession: SpacedRepetitionSession?
@@ -50,8 +51,14 @@ struct SpacedRepetitionView: View {
                     } else {
                         activeSessionView(session: session)
                     }
-                } else {
+                } else if isLoadingSession {
                     loadingView
+                } else {
+                    AppEmptyState(
+                        title: "No Cards Due",
+                        systemImage: "calendar.badge.clock",
+                        description: "No cards are due for review. Generate questions first or check back later."
+                    )
                 }
             }
             .accessibilityIdentifier("spaced-repetition-screen")
@@ -247,16 +254,20 @@ struct SpacedRepetitionView: View {
     }
 
     private func startSession() async {
+        isLoadingSession = true
+
         if let previewSession {
             currentSession = previewSession
             isSessionComplete = previewIsComplete
             sessionStats = previewStats
             showingAnswer = previewIsComplete
+            isLoadingSession = false
             return
         }
 
         guard let service = spacedRepetitionService else {
             currentSession = nil
+            isLoadingSession = false
             return
         }
 
@@ -286,6 +297,7 @@ struct SpacedRepetitionView: View {
         isSessionComplete = false
         sessionStats = nil
         startTime = Date()
+        isLoadingSession = false
     }
 
     private func recordAnswer(quality: Int) {

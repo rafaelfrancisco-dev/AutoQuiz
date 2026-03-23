@@ -17,12 +17,12 @@ enum PreviewData {
             MultipleChoiceQuestion(
                 question: "Which view type replaces NavigationView in modern SwiftUI?",
                 options: ["NavigationSplitView", "NavigationStack", "TabView", "Group"],
-                anwswer: "NavigationStack"
+                answer: "NavigationStack"
             ),
             MultipleChoiceQuestion(
                 question: "Which modifier is preferred over foregroundColor in newer SwiftUI code?",
                 options: ["foregroundStyle", "tint", "blendMode", "fill"],
-                anwswer: "foregroundStyle"
+                answer: "foregroundStyle"
             )
         ]
         item.trueFalseQuestions = [

@@ -134,6 +134,7 @@ struct DocumentQuestionAnsweringView: View {
                 axis: .vertical
             )
             .lineLimit(3...6)
+            .disabled(viewModel.isSubmittingDocumentQuestion)
 
             Button(action: submitQuestion) {
                 if viewModel.isSubmittingDocumentQuestion {
@@ -157,7 +158,7 @@ struct DocumentQuestionAnsweringView: View {
             if let issueMessage = viewModel.documentQuestionAnswerIssueMessage {
                 Text(issueMessage)
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(AppStatusTone.warning.tint)
             }
         }
         .appCardStyle()

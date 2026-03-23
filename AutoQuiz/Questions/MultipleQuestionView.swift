@@ -35,7 +35,7 @@ struct MultipleQuestionView: View {
                 ForEach(question.options, id: \.self) { option in
                     let style = QuestionButtonStyle.forMultipleChoice(
                         option: option,
-                        correctAnswer: question.anwswer,
+                        correctAnswer: question.answer,
                         selectedAnswer: selectedAnswer,
                         hasAnswered: hasAnswered
                     )
@@ -55,10 +55,10 @@ struct MultipleQuestionView: View {
         guard !hasAnswered else { return }
         selectedAnswer = option
         hasAnswered = true
-        onQuestionAnswered(option == question.anwswer, option)
+        onQuestionAnswered(option == question.answer, option)
     }
 }
 
 #Preview {
-    MultipleQuestionView(question: MultipleChoiceQuestion(question: "Yes ?", options: ["Yes", "No"], anwswer: "Yes")) { _, _ in }
+    MultipleQuestionView(question: MultipleChoiceQuestion(question: "Yes ?", options: ["Yes", "No"], answer: "Yes")) { _, _ in }
 }

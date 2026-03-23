@@ -23,7 +23,7 @@ final class SpacedRepetitionService {
             if let cardData = try? JSONEncoder().encode(question) {
                 let card = SpacedRepetitionCard(
                     questionText: question.question,
-                    answerText: question.anwswer,
+                    answerText: question.answer,
                     questionType: .multipleChoice,
                     originalQuestionData: cardData,
                     documentID: document.id,

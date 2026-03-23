@@ -31,7 +31,6 @@ struct RetryConfiguration: Sendable {
 
 enum RetryResult<T> {
     case success(T)
-    case failure(Error, attempt: Int)
     case finalFailure(Error, totalAttempts: Int)
 }
 
@@ -64,8 +63,6 @@ struct RetryMechanism {
                     
                     Logger.generation.debug("Retrying in \(delay) seconds...")
                     try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-                    
-                    return .failure(error, attempt: attempt)
                 }
             }
         }
@@ -89,9 +86,6 @@ struct RetryMechanism {
         switch result {
         case .success(let value):
             return value
-        case .failure(let error, _):
-            // This shouldn't happen with our implementation, but handle it
-            throw error
         case .finalFailure(let error, _):
             throw error
         }

@@ -103,7 +103,7 @@ struct RevisionFilteringTests {
     func appendContentAdvancesRevisionAndInvalidatesDerivedArtifacts() {
         let item = Item(timestamp: .now, content: "Original", contentRevision: 1)
         item.questions = [
-            MultipleChoiceQuestion(question: "Q", options: ["A", "B", "C", "D"], anwswer: "A")
+            MultipleChoiceQuestion(question: "Q", options: ["A", "B", "C", "D"], answer: "A")
         ]
         item.trueFalseQuestions = [TrueFalseQuestion(question: "TF", isTrue: true)]
         item.title = "Title"

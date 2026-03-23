@@ -22,7 +22,6 @@ struct AddContentView: View {
 
     @State private var isPickerPresented = false
     @State private var errorMessage: String?
-    @State private var successMessage: String?
     @State private var newContent = ""
     @State private var contentSource: ContentSource = .file
 
@@ -126,14 +125,6 @@ struct AddContentView: View {
         } message: {
             Text(errorMessage ?? "")
         }
-        .alert("Success", isPresented: successBinding) {
-            Button("OK") {
-                successMessage = nil
-                dismiss()
-            }
-        } message: {
-            Text(successMessage ?? "")
-        }
     }
     #endif
 
@@ -212,14 +203,6 @@ struct AddContentView: View {
         } message: {
             Text(errorMessage ?? "")
         }
-        .alert("Success", isPresented: successBinding) {
-            Button("OK") {
-                successMessage = nil
-                dismiss()
-            }
-        } message: {
-            Text(successMessage ?? "")
-        }
     }
 
     private var trimmedContent: String {
@@ -230,13 +213,6 @@ struct AddContentView: View {
         Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
-        )
-    }
-
-    private var successBinding: Binding<Bool> {
-        Binding(
-            get: { successMessage != nil },
-            set: { if !$0 { successMessage = nil } }
         )
     }
 
@@ -307,7 +283,7 @@ struct AddContentView: View {
         Task {
             await appStore.saveItem(item)
             await MainActor.run {
-                successMessage = "Content added successfully. Questions will be regenerated."
+                dismiss()
             }
         }
     }

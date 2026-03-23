@@ -31,7 +31,7 @@ struct DocumentViewModelLanguageFallbackTests {
     func startQuizClearsQuestionPoolsWhenLanguageModeChanges() {
         let item = Item(timestamp: .now, content: "Test content")
         item.questions = [
-            MultipleChoiceQuestion(question: "Q1", options: ["A", "B", "C", "D"], anwswer: "A")
+            MultipleChoiceQuestion(question: "Q1", options: ["A", "B", "C", "D"], answer: "A")
         ]
         item.trueFalseQuestions = [
             TrueFalseQuestion(question: "T1", isTrue: true)

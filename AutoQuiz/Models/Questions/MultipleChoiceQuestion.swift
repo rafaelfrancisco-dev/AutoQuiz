@@ -16,5 +16,5 @@ struct MultipleChoiceQuestion: Codable {
     let options: [String]
 
     @Guide(description: "The correct answer for this question")
-    let anwswer: String
+    let answer: String
 }

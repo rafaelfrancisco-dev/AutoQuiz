@@ -245,7 +245,7 @@ struct AppDashboardModalContainer<Content: View>: View {
             }
             .background(Color(.clear))
             .navigationTitle(title)
-            #if os(iOS)
+            #if os(iOS) || os(visionOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
